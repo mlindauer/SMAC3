@@ -305,6 +305,29 @@ class Scenario(object):
                 self.feature_dict = self.in_reader.read_instance_features_file(
                     self.feature_fn)[1]
 
+        # read pcs file
+        if self.pcs_fn and os.path.isfile(self.pcs_fn):
+            with open(self.pcs_fn) as fp:
+                pcs_str = fp.readlines()
+                self.cs = pcs.read(pcs_str)
+                self.cs.seed(42)
+        elif self.pcs_fn:
+            self.logger.error("Have not found pcs file: %s" %
+                              (self.pcs_fn))
+            sys.exit(1)
+
+        # you cannot set output dir to None directly
+        # because None is replaced by default always
+        if self.output_dir == "":
+            self.output_dir = None
+            self.logger.debug("Deactivate output directory.")
+        else:
+            self.logger.info("Output to %s" % (self.output_dir))
+            
+    def _update_feature_array(self):
+        '''
+            update feature_array from self.feature_dict
+        '''
         if self.feature_dict:
             self.feature_array = []
             for inst_ in self.train_insts:
@@ -325,25 +348,6 @@ class Scenario(object):
                 # update feature dictionary
                 for feat, inst_ in zip(self.feature_array, self.train_insts):
                     self.feature_dict[inst_] = feat
-
-        # read pcs file
-        if self.pcs_fn and os.path.isfile(self.pcs_fn):
-            with open(self.pcs_fn) as fp:
-                pcs_str = fp.readlines()
-                self.cs = pcs.read(pcs_str)
-                self.cs.seed(42)
-        elif self.pcs_fn:
-            self.logger.error("Have not found pcs file: %s" %
-                              (self.pcs_fn))
-            sys.exit(1)
-
-        # you cannot set output dir to None directly
-        # because None is replaced by default always
-        if self.output_dir == "":
-            self.output_dir = None
-            self.logger.debug("Deactivate output directory.")
-        else:
-            self.logger.info("Output to %s" % (self.output_dir))
 
     def __getstate__(self):
         d = dict(self.__dict__)

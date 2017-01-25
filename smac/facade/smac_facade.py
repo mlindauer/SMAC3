@@ -1,5 +1,6 @@
 import logging
 import typing
+import copy
 
 import numpy as np
 
@@ -89,15 +90,6 @@ class SMAC(object):
         initial_configuration: typing.List[Configuration]
             list of initial configurations for initial design -- 
             cannot be used togehter with initial_design
-        warmstart_runhistories: typing.List[RunHistory],
-            RunHistory objects to initialize 
-            WarmstartedRandomForestWithInstances as EPM 
-        warmstart_scenarios: typing.List[scenario],
-            Scenario objects to provide information
-            how to interpret warmstart_runhistories;
-            has to have the same length as warmstart_runhistories
-        warmstart_mode: str,
-            has to be in ["FULL","WEIGHTED","TRANSFER"] 
         stats: Stats
             optional stats object
         rng: np.random.RandomState
@@ -189,38 +181,6 @@ class SMAC(object):
                                       minR=scenario.minR,
                                       maxR=scenario.maxR)
 
-        # initial design
-        if initial_design is not None and initial_configurations is not None:
-            raise ValueError(
-                "Either use initial_design or initial_configurations; but not both")
-
-        if initial_configurations is not None:
-            initial_design = MultiConfigInitialDesign(tae_runner=tae_runner,
-                                                      scenario=scenario,
-                                                      stats=self.stats,
-                                                      traj_logger=traj_logger,
-                                                      runhistory=runhistory,
-                                                      rng=rng,
-                                                      configs=initial_configurations,
-                                                      intensifier=intensifier,
-                                                      aggregate_func=aggregate_func)
-        elif initial_design is None:
-            if scenario.initial_incumbent == "DEFAULT":
-                initial_design = DefaultConfiguration(tae_runner=tae_runner,
-                                                      scenario=scenario,
-                                                      stats=self.stats,
-                                                      traj_logger=traj_logger,
-                                                      rng=rng)
-            elif scenario.initial_incumbent == "RANDOM":
-                initial_design = RandomConfiguration(tae_runner=tae_runner,
-                                                     scenario=scenario,
-                                                     stats=self.stats,
-                                                     traj_logger=traj_logger,
-                                                     rng=rng)
-            else:
-                raise ValueError("Don't know what kind of initial_incumbent "
-                                 "'%s' is" % scenario.initial_incumbent)
-
         # initial conversion of runhistory into EPM data
         if runhistory2epm is None:
 
@@ -258,39 +218,25 @@ class SMAC(object):
                 raise ValueError('Unknown run objective: %s. Should be either '
                                  'quality or runtime.' % self.scenario.run_obj)
 
-        if warmstart_runhistories:
-            if len(warmstart_runhistories) != len(warmstart_scenarios):
-                raise ValueError(
-                    "warmstart_runhistories and warmstart_scenarios have to have the same length")
-            warmstart_models = []
-            for rh, warm_scen in zip(warmstart_runhistories, warmstart_scenarios):
-                if not rh.data: # skip empty rh
-                    continue
-                # patch runhistory to use warmstart_scenario
-                runhistory2epm.scenario = warm_scen
-                runhistory2epm.instance_features = warm_scen.feature_dict
-                runhistory2epm.n_feats = warm_scen.n_features
-                X, y = runhistory2epm.transform(rh)
-                warm_types = get_types(warm_scen.cs, warm_scen.feature_array)
-                warm_model = RandomForestWithInstances(types=warm_types,
-                                                  instance_features=warm_scen.feature_array,
-                                                  seed=rng.randint(MAXINT))
-                warm_model.train(X, y)
-                warmstart_models.append(warm_model)
-                
-            if warmstart_mode == "WEIGHTED":
-                self.logger.info("Use \"weighted\" warmstart strategy")
-                model = WarmstartedRandomForestWithInstances(types=types,
-                                                         instance_features=scenario.feature_array,
-                                                         seed=rng.randint(
-                                                             MAXINT),
-                                                         warmstart_models=warmstart_models)
-            elif warmstart_mode == "TRANSFER":
-                self.logger.info("Use \"weighted\" warmstart strategy")
-                acquisition_function = WARM_EI(model=model, warm_models=warmstart_models)
-            runhistory2epm.scenario = scenario
-            runhistory2epm.instance_features = scenario.feature_dict
-            runhistory2epm.n_feats = scenario.n_features
+
+
+        if initial_design is None:
+            if scenario.initial_incumbent == "DEFAULT":
+                initial_design = DefaultConfiguration(tae_runner=tae_runner,
+                                                      scenario=scenario,
+                                                      stats=self.stats,
+                                                      traj_logger=traj_logger,
+                                                      rng=rng)
+            elif scenario.initial_incumbent == "RANDOM":
+                initial_design = RandomConfiguration(tae_runner=tae_runner,
+                                                     scenario=scenario,
+                                                     stats=self.stats,
+                                                     traj_logger=traj_logger,
+                                                     rng=rng)
+            else:
+                raise ValueError("Don't know what kind of initial_incumbent "
+                                 "'%s' is" % scenario.initial_incumbent)
+
 
         # initial acquisition function
         if acquisition_function is None:
@@ -371,3 +317,133 @@ class SMAC(object):
             raise ValueError('SMAC was not fitted yet. Call optimize() prior '
                              'to accessing the runhistory.')
         return self.trajectory
+    
+    def warmstart_challengers(self, warmstart_trajectory_fns: typing.List[str],
+                              warmstart_runhistory_fns: typing.List[str],
+                              warmstart_scenario_fns: typing.List[str]
+                              ):
+        '''
+            warmstart challengers with previous incumbents
+            Side effect: modifies initial design 
+            
+            Arguments
+            ---------
+            warmstart_trajectory_fns: typing.List[str],
+                trajectory files to initialize 
+            warmstart_runhistory_fns: typing.List[str],
+                RunHistory files to initialize 
+                WarmstartedRandomForestWithInstances as EPM 
+            warmstart_scenario_fns: typing.List[str],
+                Scenario files to provide information
+                how to interpret warmstart_runhistories;
+                has to have the same length as warmstart_runhistories
+                
+                
+            warmstart_mode: str,
+                has to be in ["FULL","WEIGHTED","TRANSFER"] 
+        '''
+        
+        init_challengers = ChallengerWarmstart(scenario=scen,
+                     traj_fn_list=warmstart_trajectory_fns,
+                     runhist_fn_list=warmstart_runhistory_fns,
+                     scenario_fn_list=warmstart_scenario_fns,
+                     hist2epm=self.solver.rh2EPM)
+        
+        self.solver.initial_design = MultiConfigInitialDesign(tae_runner=tae_runner,
+                                                      scenario=self.solver.scenario,
+                                                      stats=self.solver.stats,
+                                                      traj_logger=self.solver.intensifer.traj_logger,
+                                                      runhistory=self.solver.runhistory,
+                                                      rng=self.solver.rng,
+                                                      configs=init_challengers,
+                                                      intensifier=self.solver.intensifier,
+                                                      aggregate_func=average_cost)
+        
+    def warmstart_model(self,
+                        warmstart_runhistory_fns: typing.List[str],
+                        warmstart_scenario_fns: typing.List[str],
+                        warmstart_mode:str):
+        '''
+            warmstarts EPM predictions depending on <warmstart_mode>
+            
+            Arguments
+            ---------
+            warmstart_runhistory_fns: typing.List[str],
+                RunHistory files to initialize 
+                WarmstartedRandomForestWithInstances as EPM 
+            warmstart_scenario_fns: typing.List[str],
+                Scenario files to provide information
+                how to interpret warmstart_runhistories;
+                has to have the same length as warmstart_runhistories
+            warmstart_mode: str,
+                has to be in ["FULL","WEIGHTED","TRANSFER"] 
+        '''
+        
+        #TODO: move most of the code to warmstart package
+        
+        rh = None
+        warm_runhistories = None
+        warm_scenarios = None
+        aggregate_func = average_cost
+        if warmstart_mode == "FULL":
+            rh = RunHistory(aggregate_func=aggregate_func)
+
+            scen, rh = merge_foreign_data_from_file(
+                scenario=self.solver.scenario,
+                runhistory=self.solver.runhistory,
+                in_scenario_fn_list=warmstart_scenario_fns,
+                in_runhistory_fn_list=warmstart_runhistory_fns,
+                cs=self.solver.scenario,
+                aggregate_func=aggregate_func)
+            # path scenario with updated feature_dictionary
+            self.solver.runhistory = rh
+            self.solver.scenario = scen
+            self.solver.rh2EPM.scenario = scen
+            # don't update EPM since it should only marginalize over current instances
+            
+        elif args_.warmstart_mode in ["WEIGHTED", "TRANSFER"]:
+            warmstart_runhistories = []
+            warm_scenarios = []
+            if len(warmstart_runhistory_fns) != len(warmstart_scenario_fns):
+                raise ValueError(
+                    "warmstart_runhistory and warmstart_scenario have to have the same lengths")
+                
+            #read files
+            for rh_fn in warmstart_runhistory_fns:
+                warm_rh = RunHistory(aggregate_func=aggregate_func)
+                warm_rh.load_json(fn=rh_fn, cs=scen.cs)
+                warmstart_runhistories.append(warm_rh)
+            for warm_scen in warmstart_scenario_fns:
+                warm_scenarios.append(
+                    Scenario(scenario=warm_scen, cmd_args={"output_dir": ""}))
+            
+            warmstart_models = []
+            runhistory2epm = copy.deepcopy(self.solver.rh2EPM)
+            for rh, warm_scen in zip(warmstart_runhistories, warmstart_scenarios):
+                if not rh.data: # skip empty rh
+                    continue
+                # patch runhistory to use warmstart_scenario
+                runhistory2epm.scenario = warm_scen
+                runhistory2epm.instance_features = warm_scen.feature_dict
+                runhistory2epm.n_feats = warm_scen.n_features
+                X, y = runhistory2epm.transform(rh)
+                warm_types = get_types(warm_scen.cs, warm_scen.feature_array)
+                warm_model = RandomForestWithInstances(types=warm_types,
+                                                  instance_features=warm_scen.feature_array,
+                                                  seed=rng.randint(MAXINT))
+                warm_model.train(X, y)
+                warmstart_models.append(warm_model)
+                
+            if warmstart_mode == "WEIGHTED":
+                self.logger.info("Use \"weighted\" warmstart strategy")
+                self.solver.model = WarmstartedRandomForestWithInstances(types=types,
+                                                         instance_features=scenario.feature_array,
+                                                         seed=rng.randint(
+                                                             MAXINT),
+                                                         warmstart_models=warmstart_models)
+            elif warmstart_mode == "TRANSFER":
+                self.logger.info("Use \"weighted\" warmstart strategy")
+                self.solver.acquisition_func = WARM_EI(model=model, warm_models=warmstart_models)
+                self.solver.acq_optimizer.acquisition_function = self.solver.acquisition_func
+            
+
