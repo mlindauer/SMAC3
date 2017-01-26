@@ -22,10 +22,9 @@ from smac.initial_design.multi_config_initial_design import \
 from smac.intensification.intensification import Intensifier
 from smac.smbo.smbo import SMBO
 from smac.smbo.objective import average_cost
-from smac.smbo.acquisition import EI, AbstractAcquisitionFunction, WARM_EI
+from smac.smbo.acquisition import EI, AbstractAcquisitionFunction
 from smac.smbo.local_search import LocalSearch
 from smac.epm.rf_with_instances import RandomForestWithInstances
-from smac.epm.rf_with_instances_warmstarted import WarmstartedRandomForestWithInstances
 from smac.epm.rfr_imputator import RFRImputator
 from smac.epm.base_epm import AbstractEPM
 from smac.utils.util_funcs import get_types
@@ -33,6 +32,8 @@ from smac.utils.io.traj_logging import TrajLogger
 from smac.utils.constants import MAXINT
 from smac.configspace import Configuration
 from smac.warmstarting.challenger_warmstart import ChallengerWarmstart
+from smac.warmstarting.transfer_warmstart import TransferWarmstart
+from smac.utils.merge_foreign_data import merge_foreign_data_from_file
 
 
 __author__ = "Marius Lindauer"
@@ -219,8 +220,6 @@ class SMAC(object):
                 raise ValueError('Unknown run objective: %s. Should be either '
                                  'quality or runtime.' % self.scenario.run_obj)
 
-
-
         if initial_design is None:
             if scenario.initial_incumbent == "DEFAULT":
                 initial_design = DefaultConfiguration(tae_runner=tae_runner,
@@ -237,7 +236,6 @@ class SMAC(object):
             else:
                 raise ValueError("Don't know what kind of initial_incumbent "
                                  "'%s' is" % scenario.initial_incumbent)
-
 
         # initial acquisition function
         if acquisition_function is None:
@@ -318,7 +316,7 @@ class SMAC(object):
             raise ValueError('SMAC was not fitted yet. Call optimize() prior '
                              'to accessing the runhistory.')
         return self.trajectory
-    
+
     def warmstart_challengers(self, warmstart_trajectory_fns: typing.List[str],
                               warmstart_runhistory_fns: typing.List[str],
                               warmstart_scenario_fns: typing.List[str]
@@ -326,7 +324,7 @@ class SMAC(object):
         '''
             warmstart challengers with previous incumbents
             Side effect: modifies initial design 
-            
+
             Arguments
             ---------
             warmstart_trajectory_fns: typing.List[str],
@@ -338,37 +336,45 @@ class SMAC(object):
                 Scenario files to provide information
                 how to interpret warmstart_runhistories;
                 has to have the same length as warmstart_runhistories
-                
-                
+
+
             warmstart_mode: str,
                 has to be in ["FULL","WEIGHTED","TRANSFER"] 
         '''
-        
+
         cw = ChallengerWarmstart(rng=self.solver.rng)
-        
+
         init_challengers = cw.get_init_challengers(scenario=self.solver.scenario,
-                     traj_fn_list=warmstart_trajectory_fns,
-                     runhist_fn_list=warmstart_runhistory_fns,
-                     scenario_fn_list=warmstart_scenario_fns,
-                     hist2epm=self.solver.rh2EPM)
-        
+                                                   traj_fn_list=warmstart_trajectory_fns,
+                                                   runhist_fn_list=warmstart_runhistory_fns,
+                                                   scenario_fn_list=warmstart_scenario_fns,
+                                                   hist2epm=self.solver.rh2EPM)
+
         self.solver.initial_design = MultiConfigInitialDesign(tae_runner=self.solver.intensifier.tae_runner,
-                                                      scenario=self.solver.scenario,
-                                                      stats=self.solver.stats,
-                                                      traj_logger=self.solver.intensifier.traj_logger,
-                                                      runhistory=self.solver.runhistory,
-                                                      rng=self.solver.rng,
-                                                      configs=init_challengers,
-                                                      intensifier=self.solver.intensifier,
-                                                      aggregate_func=average_cost)
-        
+                                                              scenario=self.solver.scenario,
+                                                              stats=self.solver.stats,
+                                                              traj_logger=self.solver.intensifier.traj_logger,
+                                                              runhistory=self.solver.runhistory,
+                                                              rng=self.solver.rng,
+                                                              configs=init_challengers,
+                                                              intensifier=self.solver.intensifier,
+                                                              aggregate_func=average_cost)
+
     def warmstart_model(self,
                         warmstart_runhistory_fns: typing.List[str],
                         warmstart_scenario_fns: typing.List[str],
-                        warmstart_mode:str):
+                        warmstart_mode: str):
         '''
             warmstarts EPM predictions depending on <warmstart_mode>
-            
+
+            Side effects on solver.runhistory, solver.scenario, solver.rh2EPM.scenario
+            for warmstart_mode == "FULL"
+
+            Side effects on solver.model for warmstart_mode == "WEIGHTED"
+
+            Side effects on solver.acq_optimizer.acquisition_function 
+            and solver.acquisition_func for warmstart_mode == "TRANSFER"
+
             Arguments
             ---------
             warmstart_runhistory_fns: typing.List[str],
@@ -381,9 +387,9 @@ class SMAC(object):
             warmstart_mode: str,
                 has to be in ["FULL","WEIGHTED","TRANSFER"] 
         '''
-        
-        #TODO: move most of the code to warmstart package
-        
+
+        # TODO: move most of the code to warmstart package
+
         rh = None
         warm_runhistories = None
         warm_scenarios = None
@@ -396,57 +402,30 @@ class SMAC(object):
                 runhistory=self.solver.runhistory,
                 in_scenario_fn_list=warmstart_scenario_fns,
                 in_runhistory_fn_list=warmstart_runhistory_fns,
-                cs=self.solver.scenario,
+                cs=self.solver.scenario.cs,
                 aggregate_func=aggregate_func)
             # path scenario with updated feature_dictionary
             self.solver.runhistory = rh
             self.solver.scenario = scen
             self.solver.rh2EPM.scenario = scen
-            # don't update EPM since it should only marginalize over current instances
-            
-        elif warmstart_mode in ["WEIGHTED", "TRANSFER"]:
-            warmstart_runhistories = []
-            warm_scenarios = []
-            if len(warmstart_runhistory_fns) != len(warmstart_scenario_fns):
-                raise ValueError(
-                    "warmstart_runhistory and warmstart_scenario have to have the same lengths")
-                
-            #read files
-            for rh_fn in warmstart_runhistory_fns:
-                warm_rh = RunHistory(aggregate_func=aggregate_func)
-                warm_rh.load_json(fn=rh_fn, cs=scen.cs)
-                warmstart_runhistories.append(warm_rh)
-            for warm_scen in warmstart_scenario_fns:
-                warm_scenarios.append(
-                    Scenario(scenario=warm_scen, cmd_args={"output_dir": ""}))
-            
-            warmstart_models = []
-            runhistory2epm = copy.deepcopy(self.solver.rh2EPM)
-            for rh, warm_scen in zip(warmstart_runhistories, warmstart_scenarios):
-                if not rh.data: # skip empty rh
-                    continue
-                # patch runhistory to use warmstart_scenario
-                runhistory2epm.scenario = warm_scen
-                runhistory2epm.instance_features = warm_scen.feature_dict
-                runhistory2epm.n_feats = warm_scen.n_features
-                X, y = runhistory2epm.transform(rh)
-                warm_types = get_types(warm_scen.cs, warm_scen.feature_array)
-                warm_model = RandomForestWithInstances(types=warm_types,
-                                                  instance_features=warm_scen.feature_array,
-                                                  seed=rng.randint(MAXINT))
-                warm_model.train(X, y)
-                warmstart_models.append(warm_model)
-                
-            if warmstart_mode == "WEIGHTED":
-                self.logger.info("Use \"weighted\" warmstart strategy")
-                self.solver.model = WarmstartedRandomForestWithInstances(types=types,
-                                                         instance_features=scenario.feature_array,
-                                                         seed=rng.randint(
-                                                             MAXINT),
-                                                         warmstart_models=warmstart_models)
-            elif warmstart_mode == "TRANSFER":
-                self.logger.info("Use \"weighted\" warmstart strategy")
-                self.solver.acquisition_func = WARM_EI(model=model, warm_models=warmstart_models)
-                self.solver.acq_optimizer.acquisition_function = self.solver.acquisition_func
-            
+            # don't update EPM since it should only marginalize over current
+            # instances
 
+        elif warmstart_mode == "WEIGHTED":
+            tw = TransferWarmstart(rng=self.solver.rng)
+            self.solver.model = tw.get_warmstart_EPM(scenario=self.solver.scenario,
+                                                     warmstart_runhistory_fns=warmstart_runhistory_fns,
+                                                     warmstart_scenario_fns=warmstart_scenario_fns,
+                                                     runhistory2epm=self.solver.rh2EPM)
+
+        elif warmstart_mode == "TRANSFER":
+            tw = TransferWarmstart(rng=self.solver.rng)
+            acq_func = tw.get_WARM_EI(
+                scenario=self.solver.scenario,
+                model=self.solver.model,
+                warmstart_runhistory_fns=warmstart_runhistory_fns,
+                warmstart_scenario_fns=warmstart_scenario_fns,
+                runhistory2epm=self.solver.rh2EPM)
+
+            self.solver.acq_optimizer.acquisition_function = acq_func
+            self.solver.acquisition_func = acq_func
