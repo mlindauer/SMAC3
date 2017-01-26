@@ -133,7 +133,7 @@ class ChallengerWarmstart(object):
                 marg = marg_contr[max_marg_index]
                 if marg / vbs < self.VBS_THRESHOLD:
                     break
-                self.logger.info("%d : %f (%.2f\%)" %(max_marg_index, marg, marg / vbs))
+                self.logger.info("%d : %f (%.2f perc)" %(max_marg_index, marg, marg / vbs))
                 initial_configs.append(configs[max_marg_index])
                 configs.remove(configs[max_marg_index])
                 Y = np.delete(Y,max_marg_index,axis=1)
