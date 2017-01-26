@@ -2,6 +2,8 @@ import numpy as np
 import scipy as sp
 import logging
 
+from sklearn.linear_model import SGDRegressor
+
 import pyrfr.regression
 
 from smac.epm.rf_with_instances import RandomForestWithInstances
@@ -80,7 +82,7 @@ class WarmstartedRandomForestWithInstances(RandomForestWithInstances):
                                            seed=seed)
         
         self.warmstart_models = warmstart_models
-        self.weights = []
+        self.sgd = SGDRegressor(random_state=12345, warm_start=True, n_iter=20)
 
         self.logger = logging.getLogger("WarmstartedRandomForestWithInstances")
 
@@ -102,33 +104,28 @@ class WarmstartedRandomForestWithInstances(RandomForestWithInstances):
         super(WarmstartedRandomForestWithInstances,self).train(X,y)
 
         y_pred = super(WarmstartedRandomForestWithInstances,self).predict(X)[0]
-        tau = self._do_test(y=y, y_pred=y_pred)
-        
-        self.weights = [tau]
+        preds = [[y_[0] for y_ in y_pred]]
+
         for model in self.warmstart_models:
             y_pred = model.predict(X)[0]
-            tau = self._do_test(y=y, y_pred=y_pred)
-            self.weights.append(tau)
-
-        self.logger.debug("Model weights: %s" %(str(self.weights)))
+            preds.append([y_[0] for y_ in y_pred])
             
-        sum_weights = np.sum(self.weights)
-        if sum_weights == 0:
-            self.weights = np.zeros((len(self.weights))) + 1/len(self.weights)
-        else:
-            self.weights = np.array(self.weights) / sum_weights
-        
-        self.logger.debug("Normalized Model weights: %s" %(str(self.weights)))
+        y_ = np.array(preds).T
+            
+        self.sgd.fit(y_,y)
+        self.logger.debug("Model weights: %s + intercept: %f" %(str(self.sgd.coef_), self.sgd.intercept_))
             
         return self
     
-    def _do_test(self, y, y_pred):
-        tau, _p_value = sp.stats.kendalltau(x=y, y=y_pred)
-        if tau < 0: # anti correlated -> weight of 0
-            tau = 0
-        elif np.isnan(tau): #if X has only one sample
-                tau = 0
-        return tau
+    #===========================================================================
+    # def _do_test(self, y, y_pred):
+    #     tau, _p_value = sp.stats.kendalltau(x=y, y=y_pred)
+    #     if tau < 0: # anti correlated -> weight of 0
+    #         tau = 0
+    #     elif np.isnan(tau): #if X has only one sample
+    #             tau = 0
+    #     return tau
+    #===========================================================================
     
 
     def predict(self, X):
@@ -147,7 +144,7 @@ class WarmstartedRandomForestWithInstances(RandomForestWithInstances):
             Predictive variance
         """
         
-        weights = self.weights
+        weights = self.sgd.coef_
         base_pred = super(WarmstartedRandomForestWithInstances,self).predict(X)
         means = [base_pred[0]]
         vars = [base_pred[1]]
@@ -157,7 +154,7 @@ class WarmstartedRandomForestWithInstances(RandomForestWithInstances):
             means.append(warm_y[0])
             vars.append(warm_y[1])
 
-        mean = np.average(means, weights=weights, axis=0)
+        mean = np.average(means, weights=weights, axis=0) + self.sgd.intercept_
         var_of_means = np.average((means - mean)**2, weights=weights, axis=0)
         var = np.average(vars, weights=weights, axis=0) + var_of_means
         
