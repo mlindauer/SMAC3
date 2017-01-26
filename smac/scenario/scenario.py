@@ -304,6 +304,8 @@ class Scenario(object):
             if os.path.isfile(self.feature_fn):
                 self.feature_dict = self.in_reader.read_instance_features_file(
                     self.feature_fn)[1]
+                    
+        self._update_feature_array()
 
         # read pcs file
         if self.pcs_fn and os.path.isfile(self.pcs_fn):

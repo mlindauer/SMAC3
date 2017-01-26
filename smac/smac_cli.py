@@ -11,7 +11,6 @@ from smac.runhistory.runhistory import RunHistory
 from smac.smbo.objective import average_cost
 from smac.utils.merge_foreign_data import merge_foreign_data_from_file
 from smac.utils.io.traj_logging import TrajLogger
-from smac.warmstarting.challenger_warmstart import ChallengerWarmstart
 
 __author__ = "Marius Lindauer"
 __copyright__ = "Copyright 2017, ML4AAD"

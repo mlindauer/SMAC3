@@ -24,13 +24,14 @@ __license__ = "3-clause BSD"
 
 class ChallengerWarmstart(object):
 
-    def __init__(self):
+    def __init__(self, rng):
         '''
             Constructor
         '''
         self.logger = logging.getLogger("ChallengerWarmstart")
         
         self.VBS_THRESHOLD = 0.01
+        self.rng = rng
 
     def get_init_challengers(self,
                              scenario: Scenario,
@@ -78,11 +79,13 @@ class ChallengerWarmstart(object):
                 scenario=scenario, runhistory=rh,
                 in_scenario_fn_list=scenario_fn_list,
                 in_runhistory_fn_list=runhist_fn_list,
-                cs=cs,
-                aggregate_func=average_cost)
+                cs=scenario.cs,
+                aggregate_func=average_cost,
+                update_train=True)
 
             # update feature array
             scenario._update_feature_array()
+            hist2epm.instance_features = scenario.feature_dict
 
             # Convert rh
             X, y = hist2epm.transform(runhistory=rh)
@@ -90,7 +93,8 @@ class ChallengerWarmstart(object):
             types = get_types(scenario.cs, scenario.feature_array)
             model = RandomForestWithInstances(types=types,
                                               instance_features=scenario.feature_array,
-                                              seed=rng.randint(MAXINT))
+                                              seed=self.rng.randint(MAXINT))
+            model.train(X,y)
             
             configs = initial_configs[:]
             
@@ -98,11 +102,12 @@ class ChallengerWarmstart(object):
                                        configs)
             C = [x.get_array() for x in imputed_configs]
             Y = []
+            n_instances = len(scenario.feature_array)
             for c in enumerate(C):
                 X_ = np.hstack(
-                    (np.tile(x, (n_instances, 1)), self.instance_features))
-                y = model.predict(X)
-                Y.append(y)
+                    (np.tile(c[1], (n_instances, 1)), scenario.feature_array))
+                y = model.predict(X_)
+                Y.append(y[0])
             Y = np.array(Y)
             
             # greedy forward selection
@@ -111,6 +116,8 @@ class ChallengerWarmstart(object):
             initial_configs = [configs[sbs_index]]
             configs.remove(configs[sbs_index])
             Y = np.delete(Y,sbs_index,axis=1)
+            
+            self.logger.info("SBS index: %d;" %(sbs_index))
             
             while True:
                 if not configs:
@@ -123,7 +130,7 @@ class ChallengerWarmstart(object):
                     marg = self._get_vbs(Y_) - vbs
                     marg_contr.append(marg)
                 max_marg_index = np.argmax(marg_contr)
-                marg = marg_contr(max_marg_index)
+                marg = marg_contr[max_marg_index]
                 if marg / vbs < self.VBS_THRESHOLD:
                     break
                 self.logger.info("%d : %f (%.2f\%)" %(max_marg_index, marg, marg / vbs))

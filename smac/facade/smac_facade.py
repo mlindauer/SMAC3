@@ -32,6 +32,7 @@ from smac.utils.util_funcs import get_types
 from smac.utils.io.traj_logging import TrajLogger
 from smac.utils.constants import MAXINT
 from smac.configspace import Configuration
+from smac.warmstarting.challenger_warmstart import ChallengerWarmstart
 
 
 __author__ = "Marius Lindauer"
@@ -343,16 +344,18 @@ class SMAC(object):
                 has to be in ["FULL","WEIGHTED","TRANSFER"] 
         '''
         
-        init_challengers = ChallengerWarmstart(scenario=scen,
+        cw = ChallengerWarmstart(rng=self.solver.rng)
+        
+        init_challengers = cw.get_init_challengers(scenario=self.solver.scenario,
                      traj_fn_list=warmstart_trajectory_fns,
                      runhist_fn_list=warmstart_runhistory_fns,
                      scenario_fn_list=warmstart_scenario_fns,
                      hist2epm=self.solver.rh2EPM)
         
-        self.solver.initial_design = MultiConfigInitialDesign(tae_runner=tae_runner,
+        self.solver.initial_design = MultiConfigInitialDesign(tae_runner=self.solver.intensifier.tae_runner,
                                                       scenario=self.solver.scenario,
                                                       stats=self.solver.stats,
-                                                      traj_logger=self.solver.intensifer.traj_logger,
+                                                      traj_logger=self.solver.intensifier.traj_logger,
                                                       runhistory=self.solver.runhistory,
                                                       rng=self.solver.rng,
                                                       configs=init_challengers,
@@ -401,7 +404,7 @@ class SMAC(object):
             self.solver.rh2EPM.scenario = scen
             # don't update EPM since it should only marginalize over current instances
             
-        elif args_.warmstart_mode in ["WEIGHTED", "TRANSFER"]:
+        elif warmstart_mode in ["WEIGHTED", "TRANSFER"]:
             warmstart_runhistories = []
             warm_scenarios = []
             if len(warmstart_runhistory_fns) != len(warmstart_scenario_fns):
