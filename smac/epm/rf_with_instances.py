@@ -91,6 +91,9 @@ class RandomForestWithInstances(AbstractEPM):
 
         # Never use a lower variance than this
         self.var_threshold = 10 ** -5
+        
+        self.min = None
+        self.max = None
 
     def train(self, X, y, **kwargs):
         """Trains the random forest on X and y.
@@ -115,6 +118,24 @@ class RandomForestWithInstances(AbstractEPM):
 
         self.rf.fit(data)
         return self
+    
+    def train_norm(self):
+        '''
+            find worst and best performance marginalized over instances
+            from all given X
+            
+            Note: If fitted, it will be used in predict_marginalized_over_instances()
+            to scale the mean prediction; 
+            Variance will not be scaled!
+        '''
+        
+        y = self.predict_marginalized_over_instances(self.X)[0]
+        self.min = np.min(y)
+        self.max = np.max(y)
+        
+        if self.min == self.max: # no scaling possible
+            self.min = 0
+            self.max = 1
 
     def predict(self, X):
         """Predict means and variances for given X.
@@ -199,9 +220,12 @@ class RandomForestWithInstances(AbstractEPM):
         var[var < self.var_threshold] = self.var_threshold
         var[np.isnan(var)] = self.var_threshold
 
+        if self.min is not None:
+            mean = (mean - self.min) / (self.max - self.min) 
+
         if len(mean.shape) == 1:
             mean = mean.reshape((-1, 1))
         if len(var.shape) == 1:
             var = var.reshape((-1, 1))
-
+            
         return mean, var

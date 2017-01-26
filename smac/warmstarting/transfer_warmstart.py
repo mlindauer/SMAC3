@@ -169,5 +169,8 @@ class TransferWarmstart(object):
         warmstart_models = self._prepare(
             warmstart_runhistory_fns, warmstart_scenario_fns, runhistory2epm,
             cs=scenario.cs)
+        
+        for w_model in warmstart_models:
+            w_model.train_norm()
 
         return WARM_EI(model=model, warm_models=warmstart_models)
