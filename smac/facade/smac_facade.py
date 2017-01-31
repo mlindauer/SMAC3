@@ -383,6 +383,12 @@ class SMAC(object):
         aggregate_func = average_cost
         if warmstart_mode == "FULL":
             rh = RunHistory(aggregate_func=aggregate_func)
+            
+            warmstart_runhistory_fns = []
+            warmstart_scenario_fns = []
+            for scen_fn, rh_list in runhist_fn_dict.items():
+                warmstart_scenario_fns.extend([scen_fn]*len(rh_list))
+                warmstart_runhistory_fns.extend(rh_list)
 
             scen, rh = merge_foreign_data_from_file(
                 scenario=self.solver.scenario,
