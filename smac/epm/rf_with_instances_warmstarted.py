@@ -129,7 +129,7 @@ class WarmstartedRandomForestWithInstances(RandomForestWithInstances):
 
         y_ = np.array(preds).T
 
-        self.sgd.fit(y_, y_test)
+        self.sgd.fit(y_, np.ravel(y_test))
         self.logger.info("Model weights: %s + intercept: %f" %
                           (str(self.sgd.coef_), self.sgd.intercept_))
 

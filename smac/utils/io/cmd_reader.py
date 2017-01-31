@@ -53,12 +53,11 @@ class CMDReader(object):
                               help=SUPPRESS)
         req_opts.add_argument("--warmstart_runhistory", default=None,
                               nargs="*",
-                              help=SUPPRESS)  # list of runhistory dump files
-        # scenario corresponding to --warmstart_runhistory; 
-        # pcs and feature space has to be identical to --scenario_file
-        req_opts.add_argument("--warmstart_scenario", default=None,
-                              nargs="*",
                               help=SUPPRESS)  
+        # list of runhistory dump files and corresponding scenario files
+        # format: <scen_file1>@rh_file1,rh_file2,... <scen_file2>:rh_fileN+1,...  
+        # scenario corresponding to --warmstart_runhistory; 
+        # pcs and feature space has to be identical with --scenario_file
         req_opts.add_argument("--warmstart_incumbent", default=None,
                               nargs="*",
                               help=SUPPRESS)# list of trajectory dump files, 
@@ -95,3 +94,12 @@ class CMDReader(object):
 
         if not os.path.isfile(args_.scenario_file):
             raise ValueError("Not found: %s" % (args_.scenario_file))
+        
+        if args_.warmstart_runhistory:
+            warm_dict = {}
+            for entry in args_.warmstart_runhistory:
+                scen_fn,rh_files = entry.split("@")
+                if warm_dict.get(scen_fn):
+                    self.logger.warn("Redefined runhistories for scenario %s" %(scen_fn))
+                warm_dict[scen_fn] = rh_files.split(",")
+            args_.warmstart_runhistory = warm_dict

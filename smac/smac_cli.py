@@ -55,11 +55,9 @@ class SMACCLI(object):
 
         if args_.warmstart_incumbent:
             optimizer.warmstart_challengers(warmstart_trajectory_fns=args_.warmstart_incumbent,
-                                            warmstart_runhistory_fns=args_.warmstart_runhistory,
-                                            warmstart_scenario_fns=args_.warmstart_scenario)
+                                            runhist_fn_dict=args_.warmstart_runhistory)
         if args_.warmstart_runhistory:
-            optimizer.warmstart_model(warmstart_runhistory_fns=args_.warmstart_runhistory,
-                                      warmstart_scenario_fns=args_.warmstart_scenario,
+            optimizer.warmstart_model(runhist_fn_dict=args_.warmstart_runhistory,
                                       warmstart_mode=args_.warmstart_mode)
         try:
             optimizer.optimize()

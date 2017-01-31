@@ -36,8 +36,7 @@ class ChallengerWarmstart(object):
     def get_init_challengers(self,
                              scenario: Scenario,
                              traj_fn_list: typing.List[str],
-                             runhist_fn_list: typing.List[str],
-                             scenario_fn_list: typing.List[str],
+                             runhist_fn_dict: typing.Dict[str, typing.List[str]],
                              hist2epm: AbstractRunHistory2EPM,
                              ):
         '''
@@ -50,10 +49,8 @@ class ChallengerWarmstart(object):
                 current scenario
             traj_fn_list:typing.List[str]
                 list of trajectory files
-            runhist_fn_list:typing.List[str]
-                list of runhistory files
-            scenario_fn_list: typing.List[str]
-                list of scenario files (in the same order as runhists
+            runhist_fn_dict:typing.Dict[str, typing.List[str]]
+                dictionary of scenario file to list of runhistory files
             hist2epm:AbstractRunHistory2EPM
                 object to convert runhistories into EPM training data
 
@@ -72,9 +69,18 @@ class ChallengerWarmstart(object):
                 fn=traj_fn, cs=scenario.cs)
             initial_configs.append(trajectory[-1]["incumbent"])
 
-        rh = RunHistory(aggregate_func=average_cost)
 
-        if runhist_fn_list and scenario_fn_list:
+        # using EPM, select a subset of initial configs
+        if runhist_fn_dict:
+            
+            rh = RunHistory(aggregate_func=average_cost)
+            
+            runhist_fn_list = []
+            scenario_fn_list = []
+            for scen_fn, rh_list in runhist_fn_dict.items():
+                scenario_fn_list.extend([scen_fn]*len(rh_list))
+                runhist_fn_list.extend(rh_list)
+            
             scenario, rh = merge_foreign_data_from_file(
                 scenario=scenario, runhistory=rh,
                 in_scenario_fn_list=scenario_fn_list,

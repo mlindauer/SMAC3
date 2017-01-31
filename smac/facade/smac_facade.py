@@ -318,8 +318,7 @@ class SMAC(object):
         return self.trajectory
 
     def warmstart_challengers(self, warmstart_trajectory_fns: typing.List[str],
-                              warmstart_runhistory_fns: typing.List[str],
-                              warmstart_scenario_fns: typing.List[str]
+                              runhist_fn_dict:typing.Dict[str, typing.List[str]]
                               ):
         '''
             warmstart challengers with previous incumbents
@@ -329,13 +328,8 @@ class SMAC(object):
             ---------
             warmstart_trajectory_fns: typing.List[str],
                 trajectory files to initialize 
-            warmstart_runhistory_fns: typing.List[str],
-                RunHistory files to initialize 
-                WarmstartedRandomForestWithInstances as EPM 
-            warmstart_scenario_fns: typing.List[str],
-                Scenario files to provide information
-                how to interpret warmstart_runhistories;
-                has to have the same length as warmstart_runhistories
+            runhist_fn_dict:typing.Dict[str, typing.List[str]]
+                dictionary of scenario file to list of runhistory files
 
 
             warmstart_mode: str,
@@ -346,8 +340,7 @@ class SMAC(object):
 
         init_challengers = cw.get_init_challengers(scenario=self.solver.scenario,
                                                    traj_fn_list=warmstart_trajectory_fns,
-                                                   runhist_fn_list=warmstart_runhistory_fns,
-                                                   scenario_fn_list=warmstart_scenario_fns,
+                                                   runhist_fn_dict=runhist_fn_dict,
                                                    hist2epm=self.solver.rh2EPM)
 
         self.solver.initial_design = MultiConfigInitialDesign(tae_runner=self.solver.intensifier.tae_runner,
@@ -361,8 +354,7 @@ class SMAC(object):
                                                               aggregate_func=average_cost)
 
     def warmstart_model(self,
-                        warmstart_runhistory_fns: typing.List[str],
-                        warmstart_scenario_fns: typing.List[str],
+                        runhist_fn_dict:typing.Dict[str, typing.List[str]],
                         warmstart_mode: str):
         '''
             warmstarts EPM predictions depending on <warmstart_mode>
@@ -377,13 +369,8 @@ class SMAC(object):
 
             Arguments
             ---------
-            warmstart_runhistory_fns: typing.List[str],
-                RunHistory files to initialize 
-                WarmstartedRandomForestWithInstances as EPM 
-            warmstart_scenario_fns: typing.List[str],
-                Scenario files to provide information
-                how to interpret warmstart_runhistories;
-                has to have the same length as warmstart_runhistories
+            runhist_fn_dict:typing.Dict[str, typing.List[str]]
+                dictionary of scenario file to list of runhistory files
             warmstart_mode: str,
                 has to be in ["FULL","WEIGHTED","TRANSFER"] 
         '''
@@ -414,8 +401,7 @@ class SMAC(object):
         elif warmstart_mode == "WEIGHTED":
             tw = TransferWarmstart(rng=self.solver.rng)
             self.solver.model = tw.get_warmstart_EPM(scenario=self.solver.scenario,
-                                                     warmstart_runhistory_fns=warmstart_runhistory_fns,
-                                                     warmstart_scenario_fns=warmstart_scenario_fns,
+                                                     runhist_fn_dict=runhist_fn_dict,
                                                      runhistory2epm=self.solver.rh2EPM)
 
         elif warmstart_mode == "TRANSFER":
@@ -423,8 +409,7 @@ class SMAC(object):
             acq_func = tw.get_WARM_EI(
                 scenario=self.solver.scenario,
                 model=self.solver.model,
-                warmstart_runhistory_fns=warmstart_runhistory_fns,
-                warmstart_scenario_fns=warmstart_scenario_fns,
+                runhist_fn_dict=runhist_fn_dict,
                 runhistory2epm=self.solver.rh2EPM)
 
             self.solver.acq_optimizer.acquisition_function = acq_func
