@@ -94,13 +94,16 @@ class MultiConfigInitialDesign(InitialDesign):
             # intensifiy will not do any configuration runs 
             # (also not on the incumbent)
             # therefore, at least two different configurations have to be in <configs>
+            minR_backup = self.intensifier.minR
+            self.intensifier.minR = max(minR_backup, 3)
             inc, inc_perf = self.intensifier.intensify(challengers=set(configs[1:]),
                                                        incumbent=configs[0],
                                                        run_history=self.runhistory,
                                                        aggregate_func=self.aggregate_func)
+            self.intensifier.minR = minR_backup
 
         else:
-            self.logger.debug("All initial challengers are identical")
+            self.logger.debug("All initial challengers are identical -- go back to single initial design")
             scid = SingleConfigInitialDesign(tae_runner=self.tae_runner,
                                              scenario=self.scenario,
                                              stats=self.stats,
@@ -111,5 +114,7 @@ class MultiConfigInitialDesign(InitialDesign):
             scid._select_configuration = get_config
             scid.run()
             inc = configs[0]
+            
+        self.logger.debug("End of initial design")
 
         return inc

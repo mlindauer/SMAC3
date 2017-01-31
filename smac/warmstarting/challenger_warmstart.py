@@ -29,7 +29,7 @@ class ChallengerWarmstart(object):
             Constructor
         '''
         self.logger = logging.getLogger("ChallengerWarmstart")
-        
+
         self.VBS_THRESHOLD = 0.01
         self.rng = rng
 
@@ -56,11 +56,11 @@ class ChallengerWarmstart(object):
                 list of scenario files (in the same order as runhists
             hist2epm:AbstractRunHistory2EPM
                 object to convert runhistories into EPM training data
-                
+
             Returns
             -------
             typing.List[Configuration]
-            
+
         '''
 
         scenario = copy.deepcopy(scenario)
@@ -94,12 +94,12 @@ class ChallengerWarmstart(object):
             model = RandomForestWithInstances(types=types,
                                               instance_features=scenario.feature_array,
                                               seed=self.rng.randint(MAXINT))
-            model.train(X,y)
-            
+            model.train(X, y)
+
             configs = initial_configs[:]
-            
+
             imputed_configs = map(ConfigSpace.util.impute_inactive_values,
-                                       configs)
+                                  configs)
             C = [x.get_array() for x in imputed_configs]
             Y = []
             n_instances = len(scenario.feature_array)
@@ -109,40 +109,50 @@ class ChallengerWarmstart(object):
                 y = model.predict(X_)
                 Y.append(y[0])
             Y = np.array(Y)
-            
+
+            if scenario.run_obj == "runtime":
+                Y = 10**Y
+
             # greedy forward selection
             perc_marg_contr = 1
-            sbs_index = self._get_sbs_index(Y)
-            initial_configs = [configs[sbs_index]]
-            configs.remove(configs[sbs_index])
-            Y = np.delete(Y,sbs_index,axis=1)
-            
-            self.logger.info("SBS index: %d;" %(sbs_index))
-            
+            #sbs_index = self._get_sbs_index(Y)
+
+            # ensure that user default is part of initial design
+            initial_configs = [configs[0]]
+            configs.remove(configs[0])
+            Y_sel = np.array(Y[0, :])
+            Y_left = np.delete(Y, 0, axis=1)
+            self.logger.info("ADD user default to initial design")
+
+            #self.logger.info("SBS index: %d;" %(sbs_index))
+
             while True:
                 if not configs:
                     break
-                vbs = self._get_vbs(Y)
+                vbs = self._get_vbs(Y_sel)
                 marg_contr = []
-                for i,c in enumerate(configs):
-                    Y_ = Y[:,:]
-                    Y_ = np.delete(Y_,i,axis=1)
-                    marg = self._get_vbs(Y_) - vbs
+                for i, c in enumerate(configs):
+                    Y_ = Y_sel[:, :]
+                    Y_ = np.vstack([Y_, Y[i, :]])
+                    marg = vbs - self._get_vbs(Y_)
                     marg_contr.append(marg)
                 max_marg_index = np.argmax(marg_contr)
                 marg = marg_contr[max_marg_index]
-                if marg / vbs < self.VBS_THRESHOLD:
+                if marg / np.abs(vbs) < self.VBS_THRESHOLD:
+                    self.logger.info(
+                        "Marginal contribution too small (%f) -- don't adding further initial configurations" % (marg / np.abs(vbs)))
                     break
-                self.logger.info("%d : %f (%.2f perc)" %(max_marg_index, marg, marg / vbs))
+                self.logger.info("%d : %f (%.2f perc)" %
+                                 (max_marg_index, marg, marg / vbs))
                 initial_configs.append(configs[max_marg_index])
                 configs.remove(configs[max_marg_index])
-                Y = np.delete(Y,max_marg_index,axis=1)
-                
+                Y_sel = np.vstack([Y_sel, Y[i, :]])
+                Y_left = np.delete(Y_left, max_marg_index, axis=1)
+
             return initial_configs
-                    
-                
+
     def _get_vbs(self, Y):
-        return np.average(np.min(Y,axis=0))
-    
+        return np.average(np.min(Y, axis=0))
+
     def _get_sbs_index(self, Y):
-        return np.argmin(np.average(Y,axis=1))
+        return np.argmin(np.average(Y, axis=1))
