@@ -45,7 +45,6 @@ class Scenario(object):
 
         """
         self.logger = logging.getLogger("scenario")
-        self.PCA_DIM = 7
 
         self.in_reader = InputReader()
 
@@ -61,6 +60,7 @@ class Scenario(object):
 
         if cmd_args:
             scenario.update(cmd_args)
+        self.cmd_args = cmd_args
 
         self._arguments = {}
         self._groups = defaultdict(set)
@@ -231,6 +231,8 @@ class Scenario(object):
                           dest='minR')
         self.add_argument(name='maxR', help=None, default=2000, callback=int,
                           dest='maxR')
+        self.add_argument(name='PCA_dim', help=None, default=7, callback=int,
+                          dest='PCA_dim')
         self.add_argument(name='instance_file', help=None, dest='train_inst_fn')
         self.add_argument(name='test_instance_file', help=None,
                           dest='test_inst_fn')
@@ -337,14 +339,15 @@ class Scenario(object):
             self.feature_array = numpy.array(self.feature_array)
             self.n_features = self.feature_array.shape[1]
             
-            # reduce dimensionality of features of larger than PCA_DIM
-            if self.feature_array.shape[1] > self.PCA_DIM:
+            # reduce dimensionality of features of larger than PCA_dim
+            if self.feature_array.shape[1] > self.PCA_dim:
+                self.logger.debug("Reduce instance features to %d dimensions using a PCA" %(self.PCA_dim))
                 X = self.feature_array
                 # scale features
                 X = MinMaxScaler().fit_transform(X)
                 X = numpy.nan_to_num(X) # if features with max == min
                 #PCA
-                pca = PCA(n_components=self.PCA_DIM)
+                pca = PCA(n_components=self.PCA_dim)
                 self.feature_array = pca.fit_transform(X)
                 self.n_features = self.feature_array.shape[1]
                 # update feature dictionary

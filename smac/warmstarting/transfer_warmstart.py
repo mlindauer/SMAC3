@@ -42,7 +42,8 @@ class TransferWarmstart(object):
     def _prepare(self,
                  runhist_fn_dict:typing.Dict[str, typing.List[str]],
                  runhistory2epm: AbstractRunHistory2EPM,
-                 cs: ConfigurationSpace
+                 cs: ConfigurationSpace,
+                 cmd_args: dict
                  ):
         '''
             read files and learn EPM for each given runhistory
@@ -55,13 +56,16 @@ class TransferWarmstart(object):
                 object to convert runhistory to X,y for EPM training
             cs: ConfigurationSpace
                 parameter configuration space
+            cmd_args: dict
+                command line arguments for scenario
         '''
         aggregate_func = average_cost
 
         warmstart_models = []
         runhistory2epm = copy.copy(runhistory2epm)
         for scen_fn, rh_fn_list in runhist_fn_dict.items():
-            warm_scen = Scenario(scenario=scen_fn, cmd_args={"output_dir": ""})
+            cmd_args.update({"output_dir": ""})
+            warm_scen = Scenario(scenario=scen_fn, cmd_args=cmd_args)
             warm_rh = RunHistory(aggregate_func=aggregate_func)
             
             warm_scen, warm_rh = merge_foreign_data_from_file(
@@ -114,7 +118,8 @@ class TransferWarmstart(object):
         warmstart_models = self._prepare(
             runhist_fn_dict=runhist_fn_dict, 
             runhistory2epm=runhistory2epm,
-            cs=scenario.cs)
+            cs=scenario.cs,
+            cmd_args=scenario.cmd_args)
         types = get_types(scenario.cs, scenario.feature_array)
 
         return WarmstartedRandomForestWithInstances(types=types,
@@ -149,7 +154,8 @@ class TransferWarmstart(object):
         warmstart_models = self._prepare(
             runhist_fn_dict=runhist_fn_dict, 
             runhistory2epm=runhistory2epm,
-            cs=scenario.cs)
+            cs=scenario.cs,
+            cmd_args=scenario.cmd_args)
         
         for w_model in warmstart_models:
             w_model.train_norm()
