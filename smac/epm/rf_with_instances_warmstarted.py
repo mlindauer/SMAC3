@@ -3,6 +3,7 @@ import scipy as sp
 import logging
 
 from sklearn.linear_model import SGDRegressor
+from sklearn.model_selection import train_test_split
 
 import pyrfr.regression
 
@@ -49,7 +50,7 @@ class WarmstartedRandomForestWithInstances(RandomForestWithInstances):
 
     seed: int
         The seed that is passed to the random_forest_run library
-        
+
     warmstart_models: list
         list of already trained models
     '''
@@ -68,19 +69,19 @@ class WarmstartedRandomForestWithInstances(RandomForestWithInstances):
                  seed=42,
                  warmstart_models=None):
 
-        RandomForestWithInstances.__init__(self, types=types, 
-                                           instance_features=instance_features, 
-                                           num_trees=num_trees, 
-                                           do_bootstrapping=do_bootstrapping, 
-                                           n_points_per_tree=n_points_per_tree, 
-                                           ratio_features=ratio_features, 
-                                           min_samples_split=min_samples_split, 
-                                           min_samples_leaf=min_samples_leaf, 
-                                           max_depth=max_depth, 
-                                           eps_purity=eps_purity, 
-                                           max_num_nodes=max_num_nodes, 
+        RandomForestWithInstances.__init__(self, types=types,
+                                           instance_features=instance_features,
+                                           num_trees=num_trees,
+                                           do_bootstrapping=do_bootstrapping,
+                                           n_points_per_tree=n_points_per_tree,
+                                           ratio_features=ratio_features,
+                                           min_samples_split=min_samples_split,
+                                           min_samples_leaf=min_samples_leaf,
+                                           max_depth=max_depth,
+                                           eps_purity=eps_purity,
+                                           max_num_nodes=max_num_nodes,
                                            seed=seed)
-        
+
         self.warmstart_models = warmstart_models
         self.sgd = SGDRegressor(random_state=12345, warm_start=True, n_iter=20)
 
@@ -100,24 +101,41 @@ class WarmstartedRandomForestWithInstances(RandomForestWithInstances):
         -------
         self
         """
-        
-        super(WarmstartedRandomForestWithInstances,self).train(X,y)
 
-        y_pred = super(WarmstartedRandomForestWithInstances,self).predict(X)[0]
+        # to get an unbiased estimate performance estimate
+        # split X,y in train and test
+        # and use prediction on test to train weights
+
+        if X.shape[0] >= 3:
+            X_train, X_test, y_train, y_test = train_test_split(
+                X, y, test_size=0.33, random_state=self.seed)
+            print("Use train test")
+        else:
+            # too few samples, train=test
+            X_train, X_test, y_train, y_test = X, X, y, y
+
+        super(WarmstartedRandomForestWithInstances, self).train(X_train, y_train)
+
+        y_pred = super(
+            WarmstartedRandomForestWithInstances, self).predict(X_test)[0]
         preds = [[y_[0] for y_ in y_pred]]
-
+        
+        # train model on all data
+        super(WarmstartedRandomForestWithInstances, self).train(X, y)
+        
         for model in self.warmstart_models:
-            y_pred = model.predict(X)[0]
+            y_pred = model.predict(X_test)[0]
             preds.append([y_[0] for y_ in y_pred])
-            
+
         y_ = np.array(preds).T
-            
-        self.sgd.fit(y_,y)
-        self.logger.debug("Model weights: %s + intercept: %f" %(str(self.sgd.coef_), self.sgd.intercept_))
-            
+
+        self.sgd.fit(y_, y_test)
+        self.logger.info("Model weights: %s + intercept: %f" %
+                          (str(self.sgd.coef_), self.sgd.intercept_))
+
         return self
-    
-    #===========================================================================
+
+    #=========================================================================
     # def _do_test(self, y, y_pred):
     #     tau, _p_value = sp.stats.kendalltau(x=y, y=y_pred)
     #     if tau < 0: # anti correlated -> weight of 0
@@ -125,8 +143,7 @@ class WarmstartedRandomForestWithInstances(RandomForestWithInstances):
     #     elif np.isnan(tau): #if X has only one sample
     #             tau = 0
     #     return tau
-    #===========================================================================
-    
+    #=========================================================================
 
     def predict(self, X):
         """Predict means and variances for given X.
@@ -143,12 +160,13 @@ class WarmstartedRandomForestWithInstances(RandomForestWithInstances):
         vars : np.ndarray  of shape = [n_samples, 1]
             Predictive variance
         """
-        
+
         weights = self.sgd.coef_
-        base_pred = super(WarmstartedRandomForestWithInstances,self).predict(X)
+        base_pred = super(
+            WarmstartedRandomForestWithInstances, self).predict(X)
         means = [base_pred[0]]
         vars = [base_pred[1]]
-        
+
         for model in self.warmstart_models:
             warm_y = model.predict(X)
             means.append(warm_y[0])
@@ -157,6 +175,5 @@ class WarmstartedRandomForestWithInstances(RandomForestWithInstances):
         mean = np.average(means, weights=weights, axis=0) + self.sgd.intercept_
         var_of_means = np.average((means - mean)**2, weights=weights, axis=0)
         var = np.average(vars, weights=weights, axis=0) + var_of_means
-        
-        return mean, var  
-        
+
+        return mean, var
