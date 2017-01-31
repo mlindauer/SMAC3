@@ -155,7 +155,8 @@ class ChallengerWarmstart(object):
                 Y_sel = np.vstack([Y_sel, Y[i, :]])
                 Y_left = np.delete(Y_left, max_marg_index, axis=1)
 
-            return initial_configs
+        return initial_configs
+        
 
     def _get_vbs(self, Y):
         return np.average(np.min(Y, axis=0))
