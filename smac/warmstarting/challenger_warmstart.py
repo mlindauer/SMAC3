@@ -113,7 +113,7 @@ class ChallengerWarmstart(object):
                 X_ = np.hstack(
                     (np.tile(c[1], (n_instances, 1)), scenario.feature_array))
                 y = model.predict(X_)
-                Y.append(y[0])
+                Y.append(np.ravel(y[0]))
             Y = np.array(Y)
 
             if scenario.run_obj == "runtime":
@@ -126,8 +126,8 @@ class ChallengerWarmstart(object):
             # ensure that user default is part of initial design
             initial_configs = [configs[0]]
             configs.remove(configs[0])
-            Y_sel = np.array(Y[0, :])
-            Y_left = np.delete(Y, 0, axis=1)
+            Y_sel = np.reshape(np.array(Y[0, :]), (1,Y.shape[1]))
+            Y_left = np.delete(Y, 0, axis=0)
             self.logger.info("ADD user default to initial design")
 
             #self.logger.info("SBS index: %d;" %(sbs_index))
@@ -138,8 +138,8 @@ class ChallengerWarmstart(object):
                 vbs = self._get_vbs(Y_sel)
                 marg_contr = []
                 for i, c in enumerate(configs):
-                    Y_ = Y_sel[:, :]
-                    Y_ = np.vstack([Y_, Y_left[i, :]])
+                    Y_add = np.reshape(Y_left[i, :], (1,Y.shape[1]))
+                    Y_ = np.vstack([Y_sel, Y_add])
                     marg = vbs - self._get_vbs(Y_)
                     marg_contr.append(marg)
                 max_marg_index = np.argmax(marg_contr)
@@ -152,8 +152,11 @@ class ChallengerWarmstart(object):
                                  (max_marg_index, marg, marg / vbs))
                 initial_configs.append(configs[max_marg_index])
                 configs.remove(configs[max_marg_index])
-                Y_sel = np.vstack([Y_sel, Y_left[i, :]])
-                Y_left = np.delete(Y_left, max_marg_index, axis=1)
+                Y_add = np.reshape(Y_left[i, :], (1,Y.shape[1]))
+                Y_sel = np.vstack([Y_sel, Y_add])
+                Y_left = np.delete(Y_left, max_marg_index, axis=0)
+
+        initial_configs = None
 
         return initial_configs
         
