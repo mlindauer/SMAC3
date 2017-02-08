@@ -156,8 +156,6 @@ class ChallengerWarmstart(object):
                 Y_sel = np.vstack([Y_sel, Y_add])
                 Y_left = np.delete(Y_left, max_marg_index, axis=0)
 
-        initial_configs = None
-
         return initial_configs
         
 
