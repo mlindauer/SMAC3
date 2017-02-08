@@ -139,7 +139,7 @@ class ChallengerWarmstart(object):
                 marg_contr = []
                 for i, c in enumerate(configs):
                     Y_ = Y_sel[:, :]
-                    Y_ = np.vstack([Y_, Y[i, :]])
+                    Y_ = np.vstack([Y_, Y_left[i, :]])
                     marg = vbs - self._get_vbs(Y_)
                     marg_contr.append(marg)
                 max_marg_index = np.argmax(marg_contr)
@@ -152,7 +152,7 @@ class ChallengerWarmstart(object):
                                  (max_marg_index, marg, marg / vbs))
                 initial_configs.append(configs[max_marg_index])
                 configs.remove(configs[max_marg_index])
-                Y_sel = np.vstack([Y_sel, Y[i, :]])
+                Y_sel = np.vstack([Y_sel, Y_left[i, :]])
                 Y_left = np.delete(Y_left, max_marg_index, axis=1)
 
         return initial_configs
