@@ -129,9 +129,15 @@ class RandomForestWithInstances(AbstractEPM):
             Variance will not be scaled!
         '''
         
-        y = self.predict_marginalized_over_instances(self.X)[0]
+        n_instance_features = self.instance_features.shape[1]
+        X = self.X[:,:self.types.shape[0]-n_instance_features]
+        if X.shape[0] > 10000: # subsample 10 000 configurations to minimize overhead
+            X = np.vstack({tuple(row) for row in X}) # set of configurations
+            X = X[np.random.randint(0,X.shape[0],10000)]
+        y = self.predict_marginalized_over_instances(X)[0]
         self.min = np.min(y)
         self.max = np.max(y)
+        self.logger.debug("Min: %f \t Max. %f" %(self.min,self.max))
         
         if self.min == self.max: # no scaling possible
             self.min = 0
@@ -222,6 +228,7 @@ class RandomForestWithInstances(AbstractEPM):
 
         if self.min is not None:
             mean = (mean - self.min) / (self.max - self.min) 
+            var = mean / (self.max - self.min) 
 
         if len(mean.shape) == 1:
             mean = mean.reshape((-1, 1))
