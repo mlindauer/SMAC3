@@ -4,8 +4,15 @@ import glob
 import re
 
 import numpy as np
-import matplotlib.pyplot as plt
+import matplotlib
+matplotlib.use('Agg')
+font = {'family' : 'normal',
+        'weight' : 'bold',
+        'size'   : 22}
 
+matplotlib.rc('font', **font)
+
+import matplotlib.pyplot as plt
 
 for scenario in os.listdir():
     if not os.path.isdir(scenario):
@@ -48,6 +55,7 @@ for scenario in os.listdir():
 
     plt.xlabel("Fraction of configuration budget")
     plt.ylabel("Weight")            
-    plt.title(scenario)
+    #plt.title(scenario)
+    plt.tight_layout()
     plt.savefig("%s_weights.pdf" %(scenario))
     plt.close()
