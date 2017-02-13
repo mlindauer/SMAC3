@@ -6,6 +6,7 @@ import typing
 from smac.configspace import Configuration
 from smac.tae.execute_ta_run import StatusType
 from smac.utils.constants import MAXINT
+from smac.tae.execute_ta_run import StatusType
 
 __author__ = "Marius Lindauer"
 __copyright__ = "Copyright 2015, ML4AAD"
@@ -282,7 +283,7 @@ class RunHistory(object):
             self.add(config=self.ids_config[int(k[0])],
                      cost=float(v[0]),
                      time=float(v[1]),
-                     status=v[2],
+                     status=StatusType(v[2]),
                      instance_id=k[1],
                      seed=int(k[2]),
                      additional_info=v[3])
