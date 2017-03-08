@@ -67,6 +67,8 @@ class ChallengerWarmstart(object):
         for traj_fn in traj_fn_list:
             trajectory = TrajLogger.read_traj_aclib_format(
                 fn=traj_fn, cs=scenario.cs)
+            inc = trajectory[-1]["incumbent"]
+            inc.origin = traj_fn
             initial_configs.append(trajectory[-1]["incumbent"])
 
 

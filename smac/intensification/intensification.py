@@ -442,6 +442,8 @@ class Intensifier(object):
             self.traj_logger.add_entry(train_perf=chal_perf,
                                        incumbent_id=self.stats.inc_changed,
                                        incumbent=challenger)
+            self.logger.info("New Incumbent Origin: %s" %(challenger.origin))
+            self.logger.info("Time used: %s" %(self.stats.get_used_wallclock_time()))
             return challenger
 
         return None  # undecided
