@@ -8,7 +8,7 @@ import numpy as np
 
 from smac.tae.execute_ta_run import StatusType
 from smac.runhistory.runhistory import RunHistory, RunKey, RunValue
-from smac.configspace import impute_inactive_values
+from smac.configspace import convert_configurations_to_array
 import smac.epm.base_imputor
 from smac.utils import constants
 
@@ -61,7 +61,8 @@ class AbstractRunHistory2EPM(object):
         rs : numpy.random.RandomState
             only used for reshuffling data after imputation
         '''
-        self.logger = logging.getLogger("runhistory2epm")
+        self.logger = logging.getLogger(
+            self.__module__ + "." + self.__class__.__name__)
 
         # General arguments
         self.scenario = scenario
@@ -80,7 +81,7 @@ class AbstractRunHistory2EPM(object):
             self.rs = np.random.RandomState()
 
         if self.impute_state is None:
-            self.impute_state = [StatusType.TIMEOUT, ]
+            self.impute_state = [StatusType.CAPPED, ]
 
         if self.success_states is None:
             self.success_states = [StatusType.SUCCESS, ]
@@ -95,7 +96,6 @@ class AbstractRunHistory2EPM(object):
         self.instance_features = scenario.feature_dict
         self.n_feats = scenario.n_features
 
-        self.logger = logging.getLogger("runhistory2epm")
         self.num_params = num_params
 
         # Sanity checks
@@ -151,8 +151,15 @@ class AbstractRunHistory2EPM(object):
 
         Parameters
         ----------
-        runhistory : list of dicts
-                parameter configurations
+        runhistory : smac.runhistory.runhistory.RunHistory
+            runhistory of all evaluated configurations x instances
+            
+        Returns
+        -------
+        X: numpy.ndarray
+            configuration vector x instance features
+        Y: numpy.ndarray
+            cost values
         '''
         assert isinstance(runhistory, RunHistory)
 
@@ -263,6 +270,41 @@ class AbstractRunHistory2EPM(object):
 
         return new_dict
 
+    def get_X_y(self, runhistory: RunHistory):
+        '''
+            simple interface to obtain all data in runhistory
+            in X, y format 
+
+            Parameters
+            ----------
+            runhistory : smac.runhistory.runhistory.RunHistory
+                runhistory of all evaluated configurations x instances
+
+            Returns
+            ------- 
+            X: numpy.ndarray
+                matrix of all configurations (+ instance features)
+            y numpy.ndarray
+                vector of cost values; can include censored runs
+            cen: numpy.ndarray
+                vector of bools indicating whether the y-value is censored
+        '''
+        X = []
+        y = []
+        cen = []
+        feature_dict = self.scenario.feature_dict
+        params = self.scenario.cs.get_hyperparameters()
+        for k, v in runhistory.data.items():
+            config = runhistory.ids_config[k.config_id]
+            x = [config[p.name] for p in params]
+            features = feature_dict.get(k.instance_id)
+            if features:
+                x.extend(features)
+            X.append(x)
+            y.append(v.cost)
+            cen.append(v.status != StatusType.SUCCESS)
+        return np.array(X), np.array(y), np.array(cen)
+
 
 class RunHistory2EPM4Cost(AbstractRunHistory2EPM):
 
@@ -296,12 +338,12 @@ class RunHistory2EPM4Cost(AbstractRunHistory2EPM):
         for row, (key, run) in enumerate(run_dict.items()):
             # Scaling is automatically done in configSpace
             conf = runhistory.ids_config[key.config_id]
-            conf = impute_inactive_values(conf)
+            conf_vector = convert_configurations_to_array([conf])[0]
             if self.n_feats:
                 feats = self.instance_features[key.instance_id]
-                X[row, :] = np.hstack((conf.get_array(), feats))
+                X[row, :] = np.hstack((conf_vector, feats))
             else:
-                X[row, :] = conf.get_array()
+                X[row, :] = conf_vector
             # run_array[row, -1] = instances[row]
             if self.scenario.run_obj == "runtime":
                 if run.status != StatusType.SUCCESS:
@@ -352,7 +394,7 @@ class RunHistory2EPM4LogCost(RunHistory2EPM4Cost):
 
 
 class RunHistory2EPM4EIPS(AbstractRunHistory2EPM):
-
+    
     def _build_matrix(self, run_dict, runhistory, instances=None, par_factor=1):
         # First build nan-matrix of size #configs x #params+1
         n_rows = len(run_dict)
@@ -364,12 +406,12 @@ class RunHistory2EPM4EIPS(AbstractRunHistory2EPM):
         for row, (key, run) in enumerate(run_dict.items()):
             # Scaling is automatically done in configSpace
             conf = runhistory.ids_config[key.config_id]
-            conf = impute_inactive_values(conf)
+            conf_vector = convert_configurations_to_array([conf])[0]
             if self.n_feats:
                 feats = self.instance_features[key.instance_id]
-                X[row, :] = np.hstack((conf.get_array(), feats))
+                X[row, :] = np.hstack((conf_vector, feats))
             else:
-                X[row, :] = conf.get_array()
+                X[row, :] = conf_vector
             # run_array[row, -1] = instances[row]
             Y[row, 0] = run.cost
             Y[row, 1] = np.log(1 + run.time)
