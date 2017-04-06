@@ -7,6 +7,7 @@ from smac.utils.io.cmd_reader import CMDReader
 from smac.scenario.scenario import Scenario
 from smac.facade.smac_facade import SMAC
 from smac.facade.roar_facade import ROAR
+from smac.facade.epils_facade import EPILS
 from smac.runhistory.runhistory import RunHistory
 from smac.smbo.objective import average_cost
 from smac.utils.merge_foreign_data import merge_foreign_data_from_file
@@ -80,6 +81,13 @@ class SMACCLI(object):
                 rng=np.random.RandomState(args_.seed),
                 runhistory=rh,
                 initial_configurations=initial_configs)
+        elif args_.modus == "EPILS":
+            optimizer = EPILS(
+                scenario=scen,
+                rng=np.random.RandomState(args_.seed),
+                runhistory=rh,
+                initial_configurations=initial_configs)
+            
         try:
             optimizer.optimize()
         except (TAEAbortException, FirstRunCrashedException) as err:

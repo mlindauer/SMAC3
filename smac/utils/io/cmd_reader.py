@@ -49,7 +49,7 @@ class CMDReader(object):
                               choices=["INFO", "DEBUG"],
                               help="random seed")
         req_opts.add_argument("--modus", default="SMAC",
-                              choices=["SMAC", "ROAR"],
+                              choices=["SMAC", "ROAR", "EPILS"],
                               help=SUPPRESS)
         req_opts.add_argument("--warmstart_runhistory", default=None,
                               nargs="*",

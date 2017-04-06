@@ -89,6 +89,8 @@ class Intensifier(object):
 
         self._num_run = 0
         self._chall_indx = 0
+        
+        self.log_traj = True
 
     def intensify(self, challengers: typing.List[Configuration],
                   incumbent: Configuration,
@@ -454,8 +456,9 @@ class Intensifier(object):
                 else:
                     self.logger.debug("  %s remains unchanged: %r" %
                             (param[0], param[1]))
-            self.stats.inc_changed += 1
-            self.traj_logger.add_entry(train_perf=chal_perf,
+            if self.log_traj:
+                self.stats.inc_changed += 1
+                self.traj_logger.add_entry(train_perf=chal_perf,
                                        incumbent_id=self.stats.inc_changed,
                                        incumbent=challenger)
             return challenger
