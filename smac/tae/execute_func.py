@@ -77,11 +77,15 @@ class AbstractTAFunc(ExecuteTARun):
                 additional_info: dict
                     all further additional run information
         """
+        
+        # walltime for pynisher has to be a rounded up integer
+        if cutoff is not None:
+            cutoff = int(math.ceil(cutoff))
 
         arguments = {'logger': logging.getLogger("pynisher"),
                      'wall_time_in_s': cutoff,
                      'mem_in_mb': self.memory_limit}
-        
+
         obj = pynisher.enforce_limits(**arguments)(self.ta)
 
         obj_kwargs = {}

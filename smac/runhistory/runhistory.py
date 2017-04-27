@@ -63,7 +63,7 @@ class RunHistory(object):
             status, instance_id=None,
             seed=None,
             additional_info=None,
-            external_data:bool=False):
+            external_data: bool=False):
         '''
         adds a data of a new target algorithm (TA) run;
         it will update data if the same key values are used
@@ -88,7 +88,9 @@ class RunHistory(object):
                 information from TA or fields such as start time and host_id)
             external_data: bool
                 if True, run will not be added to self._configid_to_inst_seed
-                and not available through get_runs_for_config()
+                and not available through get_runs_for_config();
+                essentially, intensification will not see this run,
+                but the EPM still gets it
         '''
 
         config_id = self.config_ids.get(config)
@@ -102,19 +104,31 @@ class RunHistory(object):
         v = RunValue(cost, time, status, additional_info)
 
         # Each runkey is supposed to be used only once. Repeated tries to add
-        # the same runkey will be ignored silently.
+        # the same runkey will be ignored silently if not capped.
         if self.data.get(k) is None:
-            self.data[k] = v
+            self._add(k, v, status, external_data)
+        elif status != StatusType.CAPPED and self.data[k].status == StatusType.CAPPED:
+            # overwrite capped runs with uncapped runs
+            self._add(k, v, status, external_data)
+        elif status == StatusType.CAPPED and self.data[k].status == StatusType.CAPPED and cost > self.data[k].cost:
+            # overwrite if censored with a larger cutoff
+            self._add(k, v, status, external_data)
 
-            if not external_data:
-                # also add to fast data structure
-                is_k = InstSeedKey(instance_id, seed)
-                self._configid_to_inst_seed[
-                    config_id] = self._configid_to_inst_seed.get(config_id, [])
-                self._configid_to_inst_seed[config_id].append(is_k)
+    def _add(self, k, v, status, external_data):
+        '''
+            actual function to add new entry to data structures
+        '''
+        self.data[k] = v
 
-            # assumes an average across runs as cost function
-            self.incremental_update_cost(config, cost)
+        if not external_data and status != StatusType.CAPPED:
+            # also add to fast data structure
+            is_k = InstSeedKey(k.instance_id, k.seed)
+            self._configid_to_inst_seed[
+                k.config_id] = self._configid_to_inst_seed.get(k.config_id, [])
+            self._configid_to_inst_seed[k.config_id].append(is_k)
+
+            # assumes an average across runs as cost function aggregation
+            self.incremental_update_cost(self.ids_config[k.config_id], v.cost)
 
     def update_cost(self, config):
         '''
@@ -159,7 +173,7 @@ class RunHistory(object):
 
     def incremental_update_cost(self, config: Configuration, cost: float):
         '''
-            incrementally updates the performance of a configuration by using a moving average; 
+            incrementally updates the performance of a configuration by using a moving average;
 
             Arguments
             --------
@@ -214,7 +228,7 @@ class RunHistory(object):
 
         Returns
         ----------
-            bool: True if runs have been added to the RunHistory, 
+            bool: True if runs have been added to the RunHistory,
                   False otherwise
         """
         return len(self.data) == 0
@@ -237,6 +251,7 @@ class RunHistory(object):
             using encoder implied using object_hook defined in StatusType
             to deserialize from json.
             """
+
             def default(self, obj):
                 if isinstance(obj, StatusType):
                     return {"__enum__": str(obj)}
@@ -266,15 +281,13 @@ class RunHistory(object):
         cs : ConfigSpace
             instance of configuration space
         """
-
         with open(fn) as fp:
             all_data = json.load(fp, object_hook=StatusType.enum_hook)
 
         self.ids_config = {int(id_): Configuration(cs, values=values)
                            for id_, values in all_data["configs"].items()}
 
-        self.config_ids = {Configuration(cs, values=values): int(id_)
-                           for id_, values in all_data["configs"].items()}
+        self.config_ids = {config: id_ for id_, config in self.ids_config.items()}
 
         self._n_id = len(self.config_ids)
 
@@ -302,7 +315,7 @@ class RunHistory(object):
         new_runhistory.load_json(fn, cs)
         self.update(runhistory=new_runhistory)
 
-    def update(self, runhistory, external_data:bool=False):
+    def update(self, runhistory, external_data: bool=False):
         """Update the current runhistory by adding new runs from a json file.
 
         Parameters
@@ -310,7 +323,7 @@ class RunHistory(object):
         runhistory: RunHistory
             runhistory with additional data to be added to self
         external_data: bool
-            if True, run will not be added to self._configid_to_inst_seed 
+            if True, run will not be added to self._configid_to_inst_seed
             and not available through get_runs_for_config()
         """
 

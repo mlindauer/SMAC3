@@ -1,19 +1,19 @@
 from smac.runhistory.runhistory import RunHistory
 from smac.scenario.scenario import Scenario
 from smac.configspace import ConfigurationSpace
-from smac.smbo.objective import average_cost
+from smac.optimizer.objective import average_cost
 
 import typing
 
-def merge_foreign_data_from_file(scenario: Scenario, 
+def merge_foreign_data_from_file(scenario: Scenario,
                                  runhistory: RunHistory,
-                                 in_scenario_fn_list: typing.List[str], 
+                                 in_scenario_fn_list: typing.List[str],
                                  in_runhistory_fn_list: typing.List[str],
                                  cs: ConfigurationSpace,
                                  aggregate_func: typing.Callable = average_cost,
                                  update_train:bool=False):
     '''
-        extend <scenario> and <runhistory> with runhistory data from another <in_scenario> 
+        extend <scenario> and <runhistory> with runhistory data from another <in_scenario>
         assuming the same pcs, feature space, but different instances
 
         Arguments
@@ -53,13 +53,13 @@ def merge_foreign_data_from_file(scenario: Scenario,
                               update_train=update_train)
 
 
-def merge_foreign_data(scenario: Scenario, 
+def merge_foreign_data(scenario: Scenario,
                        runhistory: RunHistory,
                        in_scenario_list: typing.List[Scenario], 
                        in_runhistory_list: typing.List[RunHistory],
                        update_train:bool=False):
     '''
-        extend <scenario> and <runhistory> with runhistory data from another <in_scenario> 
+        extend <scenario> and <runhistory> with runhistory data from another <in_scenario>
         assuming the same pcs, feature space, but different instances
 
         Arguments
@@ -69,7 +69,7 @@ def merge_foreign_data(scenario: Scenario,
         runhistory: RunHistory
             original runhistory -- will be extended by further data points
         in_scenario_list: typing.List[Scenario]
-            input scenario 
+            input scenario
         in_runhistory_list: typing.List[RunHistory]
             list of runhistories wrt <in_scenario>
         update_train: bool

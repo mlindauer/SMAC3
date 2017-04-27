@@ -6,8 +6,8 @@ import unittest
 from smac.runhistory.runhistory import RunHistory, RunKey
 from smac.utils import test_helpers
 from smac.tae.execute_ta_run import StatusType
-from smac.smbo import pSMAC
-from smac.smbo.objective import average_cost
+from smac.optimizer import pSMAC
+from smac.optimizer.objective import average_cost
 
 
 class TestPSMAC(unittest.TestCase):
@@ -71,7 +71,7 @@ class TestPSMAC(unittest.TestCase):
 
         pSMAC.write(run_history, self.tmp_dir, 20)
 
-        output_filename = os.path.join(self.tmp_dir, '.runhistory_20.json')
+        output_filename = os.path.join(self.tmp_dir, 'runhistory.json')
         self.assertTrue(os.path.exists(output_filename))
 
         fixture = json.loads(fixture, object_hook=StatusType.enum_hook)
@@ -104,7 +104,7 @@ class TestPSMAC(unittest.TestCase):
                   '"2": {"x": -4.998284377739827, "y": 4.534988589477597}}}'
 
         other_runhistory_filename = os.path.join(self.tmp_dir,
-                                                 '.runhistory_20.json')
+                                                 'runhistory.json')
         with open(other_runhistory_filename, 'w') as fh:
             fh.write(other_runhistory)
 
