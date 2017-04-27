@@ -190,57 +190,6 @@ class EI(AbstractAcquisitionFunction):
         else:
             return f
         
-class WARM_EI(EI):
-    def __init__(self,
-                 model,
-                 par=0.0,
-                 warm_models=[],
-                 **kwargs):
-        '''
-            see doc of inherit class
-        '''
-
-        super(WARM_EI, self).__init__(model=model, par=par, **kwargs)
-        self.long_name = 'Warmstarted Expected Improvement'
-        
-        self.warm_models = warm_models
-        self.mins = []
-    
-    def update(self, X, **kwargs):
-        
-        super(EI, self).update(**kwargs)
-        self.mins = []
-        for model in self.warm_models:
-            y = model.predict_marginalized_over_instances(X)[0]
-            self.mins.append(np.min(y))
-        
-    def transfer_func(self, X):
-        
-        v = []
-        idx = 0
-        for min_y, model in zip(self.mins, self.warm_models):
-            y = model.predict_marginalized_over_instances(X)[0]
-            y = [y_[0] for y_ in y]
-            y = np.min([y, [min_y]*len(y)], axis=0)
-            v.append(y)
-            idx += 1
-        return np.mean(v,axis=0)
-        
-    def _compute(self, X, derivative=False, **kwargs):
-        '''
-            compute EI and add transfer function from warmstarted models
-        '''
-        #self.logger.debug("CALL WEI")
-        ei_y = super(WARM_EI, self)._compute(X=X, derivative=derivative)
-        transfer_y = self.transfer_func(X)
-        transfer_y = [[t] for t in transfer_y]
-        #for ey,ty in zip(ei_y,transfer_y):
-            #self.logger.debug("EI: %f + Transfer: %f" %(ey[0],ty[0]))
-        # since we maximize ACQ, but minimized transfer_y,
-        # we have to ei + -1* transfer
-        return ei_y - transfer_y
-
-
 class EIPS(EI):
     def __init__(self,
                  model,

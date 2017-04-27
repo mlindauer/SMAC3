@@ -191,7 +191,7 @@ class SMBO(BaseSolver):
         else:
             incumbent_value = self.runhistory.get_cost(self.incumbent)
 
-        self.acquisition_func.update(model=self.model, eta=incumbent_value)
+        self.acquisition_func.update(X=X, model=self.model, eta=incumbent_value)
 
         # Get configurations sorted by EI
         next_configs_by_random_search_sorted = \

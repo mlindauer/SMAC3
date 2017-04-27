@@ -13,11 +13,11 @@ from smac.configspace import ConfigurationSpace
 from smac.utils.io.traj_logging import TrajLogger
 from smac.utils.merge_foreign_data import merge_foreign_data_from_file
 from smac.scenario.scenario import Scenario
-from smac.smbo.objective import average_cost
+from smac.optimizer.objective import average_cost
 from smac.utils.util_funcs import get_types
 from smac.utils.constants import MAXINT
 from smac.epm.rf_with_instances_warmstarted import WarmstartedRandomForestWithInstances
-from smac.smbo.acquisition import EI, AbstractAcquisitionFunction, WARM_EI
+from smac.optimizer.acquisition import EI, AbstractAcquisitionFunction, WARM_EI
 
 __author__ = "Marius Lindauer"
 __copyright__ = "Copyright 2017, ML4AAD"
