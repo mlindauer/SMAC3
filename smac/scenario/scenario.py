@@ -328,12 +328,7 @@ class Scenario(object):
                 self.feature_dict = self.in_reader.read_instance_features_file(
                     self.feature_fn)[1]
 
-        if self.feature_dict:
-            self.feature_array = []
-            for inst_ in self.train_insts:
-                self.feature_array.append(self.feature_dict[inst_])
-            self.feature_array = numpy.array(self.feature_array)
-            self.n_features = self.feature_array.shape[1]
+        self._update_feature_array()
 
         # read pcs file
         if self.pcs_fn and os.path.isfile(self.pcs_fn):
@@ -362,6 +357,14 @@ class Scenario(object):
             # per default, we assume that
             # all psmac runs write to the same directory
             self.input_psmac_dirs = [self.output_dir]
+            
+    def _update_feature_array(self):
+        if self.feature_dict:
+            self.feature_array = []
+            for inst_ in self.train_insts:
+                self.feature_array.append(self.feature_dict[inst_])
+            self.feature_array = numpy.array(self.feature_array)
+            self.n_features = self.feature_array.shape[1]
 
     def __getstate__(self):
         d = dict(self.__dict__)

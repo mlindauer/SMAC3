@@ -225,6 +225,8 @@ class AbstractRunHistory2EPM(object):
             # If we do not impute, we also return TIMEOUT data
             X = np.vstack((X, tX))
             Y = np.concatenate((Y, tY))
+            
+        self.logger.debug("Converted observations for EPM: %d" %(X.shape[0]))
 
         return X, Y
 
