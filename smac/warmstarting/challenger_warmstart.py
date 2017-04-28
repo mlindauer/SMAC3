@@ -9,7 +9,7 @@ import ConfigSpace.util
 from smac.runhistory.runhistory2epm import AbstractRunHistory2EPM
 from smac.runhistory.runhistory import RunHistory
 from smac.epm.rf_with_instances import RandomForestWithInstances
-from smac.configspace import ConfigurationSpace
+from smac.configspace import ConfigurationSpace, convert_configurations_to_array
 from smac.utils.io.traj_logging import TrajLogger
 from smac.utils.merge_foreign_data import merge_foreign_data_from_file
 from smac.scenario.scenario import Scenario
@@ -105,10 +105,8 @@ class ChallengerWarmstart(object):
             model.train(X, y)
 
             configs = initial_configs[:]
-
-            imputed_configs = map(ConfigSpace.util.impute_inactive_values,
-                                  configs)
-            C = [x.get_array() for x in imputed_configs]
+            C = convert_configurations_to_array(configs)
+            
             Y = []
             n_instances = len(scenario.feature_array)
             for c in enumerate(C):
@@ -117,15 +115,30 @@ class ChallengerWarmstart(object):
                 y = model.predict(X_)
                 Y.append(np.ravel(y[0]))
             Y = np.array(Y)
-
+            
             if scenario.run_obj == "runtime":
                 Y = 10**Y
+
+            # ensure that user default is part of initial design
+            sel_configs = [configs[0]]
+            sel_Y = [Y[0]]
+            # select one config per scenario
+            for traj_fn in traj_fn_list:
+                scores = []
+                for c,Y_ in zip(configs,Y):
+                    if c.origin == traj_fn:
+                        scores.append((np.mean(Y_),Y_,c))
+                best_c_indx = np.argmin([s[0] for s in scores])
+                sel_Y.append(scores[best_c_indx][1])
+                sel_configs.append(scores[best_c_indx][2])
+            configs = sel_configs
+            Y = np.array(sel_Y)
 
             # greedy forward selection
             perc_marg_contr = 1
             #sbs_index = self._get_sbs_index(Y)
 
-            # ensure that user default is part of initial design
+            # again ensure that user default is part of initial design
             initial_configs = [configs[0]]
             configs.remove(configs[0])
             Y_sel = np.reshape(np.array(Y[0, :]), (1,Y.shape[1]))
