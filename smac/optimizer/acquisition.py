@@ -387,7 +387,7 @@ class WARM_EI(EI):
                 dimensions of one X.
         '''
         #self.logger.debug("CALL WEI")
-        ei_y = super(WARM_EI, self)._compute(X=X, derivative=derivative)
+        ei_y = super(WARM_EI, self)._compute(X=X)
         transfer_y = self.transfer_func(X)
         transfer_y = [[t] for t in transfer_y]
         #for ey,ty in zip(ei_y,transfer_y):
