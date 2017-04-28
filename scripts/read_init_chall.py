@@ -62,15 +62,15 @@ for scenario in os.listdir():
             for line in fp:
                 if line.startswith("INFO:scenario:Reading scenario file"):
                     scen = line.split("/")[-2]
-                    scen_order.append(scen)
+                    if scen not in scen_order:
+                        scen_order.extend([scen]*20)
                 match = regex_warm.match(line)
                 if match:
                     idx = int(match.group("idx")) 
                     try:
                         scen = scen_order.pop(idx)
                     except:
-                        pass
-                        #print("WARNING: Could not pop %d idx" %(idx))
+                        print("WARNING: Could not pop %d idx" %(idx))
                     inc_from.append(scen)
                 match = regex_change.match(line)
                 if match:
@@ -119,9 +119,9 @@ for scenario in os.listdir():
         
         for s,p in max_impr.items():
             if p < -100:
-                max_impr[s] = 0 # clean broken run
+                max_impr[s] = 0 # clean broken validation
         
-        if sum(max_impr.values()) == 0:
+        if sum(max_impr.values()) == 0: # no data - broken run
             continue
         scen_data[scenario] = scen_data.get(scenario,[])
         scen_data[scenario].append(max_impr)

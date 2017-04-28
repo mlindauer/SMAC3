@@ -333,15 +333,38 @@ class WARM_EI(EI):
         self.mins = []
     
     def update(self, X, **kwargs):
+        '''
+            update estimated best y across instances;
+            needed to compute transfer function
+            
+            Parameters
+            ----------
+            X: np.ndarray(N, D), The input points where the acquisition function
+                should be evaluated. The dimensionality of X is (N, D), with N as
+                the number of points to evaluate at and D is the number of
+                dimensions of one X.
+        '''
         
         super(EI, self).update(**kwargs)
         self.mins = []
         for model in self.warm_models:
+            # remove instance features
+            if X.shape[1] > model.n_params:
+                X = X[:,:model.n_params] 
             y = model.predict_marginalized_over_instances(X)[0]
             self.mins.append(np.min(y))
         
     def transfer_func(self, X):
-        
+        '''
+            transfer function 
+            
+            Parameters
+            ----------
+            X: np.ndarray(N, D), The input points where the acquisition function
+                should be evaluated. The dimensionality of X is (N, D), with N as
+                the number of points to evaluate at and D is the number of
+                dimensions of one X.
+        '''
         v = []
         idx = 0
         for min_y, model in zip(self.mins, self.warm_models):
@@ -352,9 +375,16 @@ class WARM_EI(EI):
             idx += 1
         return np.mean(v,axis=0)
         
-    def _compute(self, X, derivative=False, **kwargs):
+    def _compute(self, X, **kwargs):
         '''
             compute EI and add transfer function from warmstarted models
+            
+            Parameters
+            ----------
+            X: np.ndarray(N, D), The input points where the acquisition function
+                should be evaluated. The dimensionality of X is (N, D), with N as
+                the number of points to evaluate at and D is the number of
+                dimensions of one X.
         '''
         #self.logger.debug("CALL WEI")
         ei_y = super(WARM_EI, self)._compute(X=X, derivative=derivative)
