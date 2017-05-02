@@ -98,7 +98,7 @@ class ExecuteTARunOld(ExecuteTARun):
                     status, runtime, runlength, quality, seed, additional_info = fields
                     additional_info = {"additional_info": additional_info}
 
-                runtime = min(float(runtime), cutoff)
+                runtime = float(runtime)
                 quality = float(quality)
                 seed = int(seed)
 
