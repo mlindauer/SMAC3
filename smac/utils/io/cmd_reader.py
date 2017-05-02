@@ -10,6 +10,7 @@ import logging
 import numpy
 import glob
 import typing
+import random
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter, SUPPRESS
 
 
@@ -71,6 +72,10 @@ class CMDReader(object):
         req_opts.add_argument("--warmstart_mode", default="None",
                               choices = ["None","FULL","WEIGHTED","TRANSFER"],
                               help=SUPPRESS)
+        
+        req_opts.add_argument("--warmstart_max_read", default=4,
+                              type=int,
+                              help=SUPPRESS)
 
         args_, misc = parser.parse_known_args()
         self._check_args(args_)
@@ -101,11 +106,13 @@ class CMDReader(object):
             raise ValueError("Not found: %s" % (args_.scenario_file))
         
         if args_.warmstart_runhistory:
-            args_.warmstart_runhistory = self._convert_warm_args(arg=args_.warmstart_runhistory)
+            args_.warmstart_runhistory = self._convert_warm_args(arg=args_.warmstart_runhistory, 
+                                                                 max_to_read=args_.warmstart_max_read)
         if args_.warmstart_incumbent:
-            args_.warmstart_incumbent = self._convert_warm_args(arg=args_.warmstart_incumbent)
+            args_.warmstart_incumbent = self._convert_warm_args(arg=args_.warmstart_incumbent, 
+                                                                max_to_read=args_.warmstart_max_read)
              
-    def _convert_warm_args(self, arg:typing.List[str]):
+    def _convert_warm_args(self, arg:typing.List[str], max_to_read:int=4):
         conv_dict = {}
         for entry in arg:
             scen_fn, files_ = entry.split("@")
@@ -114,4 +121,6 @@ class CMDReader(object):
             conv_dict[scen_fn] = []
             for file_ in files_.split(","):
                 conv_dict[scen_fn].extend(glob.glob(file_))
+            if len(conv_dict[scen_fn]) > max_to_read:
+                conv_dict[scen_fn] = random.sample(conv_dict[scen_fn],max_to_read)
         return conv_dict
