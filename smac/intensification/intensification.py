@@ -357,8 +357,6 @@ class Intensifier(object):
 
             !Only applicable if self.run_obj_time
 
-            !runs on incumbent should be superset of the runs performed for the challenger
-
             Parameters
             ----------
             challenger : Configuration
@@ -382,8 +380,10 @@ class Intensifier(object):
         # cost used by challenger for going over all its runs
         # should be subset of runs of incumbent (not checked for efficiency
         # reasons)
-        chall_inst_seeds = run_history.get_runs_for_config(challenger)
-        chal_sum_cost = sum_cost(config=challenger, instance_seed_pairs=chall_inst_seeds,
+        inc_inst_seeds = set(run_history.get_runs_for_config(incumbent))
+        chall_inst_seeds = set(run_history.get_runs_for_config(challenger))
+        inst_seeds = inc_inst_seeds.intersection(chall_inst_seeds)
+        chal_sum_cost = sum_cost(config=challenger, instance_seed_pairs=inst_seeds,
                                  run_history=run_history)
         cutoff = min(self.cutoff,
                      inc_sum_cost *
@@ -435,22 +435,21 @@ class Intensifier(object):
         print("INC: %.2f vs %.2f :CHAL (on %d runs)" %(inc_perf, chal_perf, len(to_compare_runs)))
         
 
-        # Line 15
+        # use statistical test to reject challenger
         if self.stat_test > 0.0:
             chall_id = run_history.config_ids[challenger]
             inc_id = run_history.config_ids[incumbent]
-            x, y = [], []
-            for inst, seed in list(to_compare_runs):
-                rk = RunKey(chall_id, inst, seed)
-                x.append(run_history.data[rk].cost)
-                rk = RunKey(inc_id, inst, seed)
-                y.append(run_history.data[rk].cost)
-            if self._perm_test(x=np.array(x), y=np.array(y), alpha=self.stat_test):
+            if self._perm_test(confid_1=chall_id,
+                               confid_2=inc_id,
+                               run_history=run_history,
+                               to_compare_runs=to_compare_runs,
+                               alpha=self.stat_test):
                 self.logger.debug("Incumbent (%.4f) is better than challenger (%.4f) on %d runs (using permutation test)." % (
                     inc_perf, chal_perf, len(chall_runs)))
                 return incumbent
-            
         else:
+            # Line 15
+            # reject challenger based on mean cost
             if chal_perf > inc_perf and len(chall_runs) >= self.minR:
                 # Incumbent beats challenger
                 self.logger.debug("Incumbent (%.4f) is better than challenger (%.4f) on %d runs." % (
@@ -462,55 +461,72 @@ class Intensifier(object):
             # Challenger is as good as incumbent
             # and has at least the same runs as inc
             # -> change incumbent
+            if chal_perf <= inc_perf:
 
-            n_samples = len(chall_runs)
-            self.logger.info("Challenger (%.4f) is better than incumbent (%.4f) on %d runs." % (
-                chal_perf, inc_perf, n_samples))
-            # Show changes in the configuration
-            params = sorted([(param, incumbent[param], challenger[param]) for param in
-                    challenger.keys()])
-            self.logger.info("Changes in incumbent:")
-            for param in params:
-                if param[1] != param[2]:
-                    self.logger.info("  %s : %r -> %r" % (param))
-                else:
-                    self.logger.debug("  %s remains unchanged: %r" %
-                            (param[0], param[1]))
-            if self.log_traj:
-                self.stats.inc_changed += 1
-                self.traj_logger.add_entry(train_perf=chal_perf,
-                                       incumbent_id=self.stats.inc_changed,
-                                       incumbent=challenger)
-            return challenger
+                n_samples = len(inc_runs)
+                self.logger.info("Challenger (%.4f) is better than incumbent (%.4f) on %d runs." % (
+                    chal_perf, inc_perf, n_samples))
+                # Show changes in the configuration
+                params = sorted([(param, incumbent[param], challenger[param]) for param in
+                        challenger.keys()])
+                self.logger.info("Changes in incumbent:")
+                for param in params:
+                    if param[1] != param[2]:
+                        self.logger.info("  %s : %r -> %r" % (param))
+                    else:
+                        self.logger.debug("  %s remains unchanged: %r" %
+                                (param[0], param[1]))
+                if self.log_traj:
+                    self.stats.inc_changed += 1
+                    self.traj_logger.add_entry(train_perf=chal_perf,
+                                           incumbent_id=self.stats.inc_changed,
+                                           incumbent=challenger)
+                return challenger
+            else:
+                self.logger.debug("Incumbent (%.4f) is better than challenger (%.4f) on %d runs." % (
+                    inc_perf, chal_perf, len(chall_runs)))
+                return incumbent
 
         return None  # undecided
     
-    def _perm_test(self, x:np.ndarray, y:np.ndarray, alpha:float=0.05, perms=10000):
+    def _perm_test(self, 
+                   confid_1:Configuration, 
+                   confid_2:Configuration, 
+                   run_history:RunHistory, 
+                   to_compare_runs, 
+                   alpha:float=0.05, 
+                   perms=10000):
         '''
             one-sided paired permutation test, 
-            H_1: y is better than x
+            H_1: conf_2 is better than conf_1
         '''
         
+        x, y = [], []
+        for inst, seed in list(to_compare_runs):
+            rk = RunKey(confid_1, inst, seed)
+            x.append(run_history.data[rk].cost)
+            rk = RunKey(confid_2, inst, seed)
+            y.append(run_history.data[rk].cost)
+        x = np.array(x)
+        y = np.array(y)
+    
         n = x.shape[0]
         base_metric = np.sum(x) - np.sum(y)
         if base_metric == 0:
             return False
         XY = np.vstack((x,y))
-        print(XY)
         metrics = []
         for _ in range(perms):
-            XY = __permute_columns(x=XY)
+            XY = self.__permute_columns(x=XY)
             metrics.append(np.sum(XY[0,:]) - np.sum(XY[1,:]))
-            print(XY)
-            print(XY[0,:].shape)
-        perc = sp.stats.percentileofscore(a=XY, score=base_metric, kind="weak")
-        print(perc)
+        perc = sp.stats.percentileofscore(a=metrics, score=base_metric, kind="weak") / 100
+        self.logger.debug("Percentile of permutation test: %f" %(perc))
         if perc > 1 - alpha:
             return True
         else:
             return False
         
-    def __permute_columns(x):
+    def __permute_columns(self, x):
         ix_i = np.random.sample(x.shape).argsort(axis=0)
         ix_j = np.tile(np.arange(x.shape[1]), (x.shape[0], 1))
         return x[ix_i, ix_j]
