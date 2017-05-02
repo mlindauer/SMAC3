@@ -55,7 +55,7 @@ class SMACCLI(object):
                 rng=np.random.RandomState(args_.seed))
 
         if args_.warmstart_incumbent:
-            optimizer.warmstart_challengers(warmstart_trajectory_fns=args_.warmstart_incumbent,
+            optimizer.warmstart_challengers(warmstart_traj_dicts=args_.warmstart_incumbent,
                                             runhist_fn_dict=args_.warmstart_runhistory)
         if args_.warmstart_runhistory:
             optimizer.warmstart_model(runhist_fn_dict=args_.warmstart_runhistory,

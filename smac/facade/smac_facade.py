@@ -423,7 +423,7 @@ class SMAC(object):
                              'to accessing the runhistory.')
         return self.trajectory
 
-    def warmstart_challengers(self, warmstart_trajectory_fns: typing.List[str],
+    def warmstart_challengers(self, warmstart_traj_dicts: typing.Dict[str, typing.List[str]],
                               runhist_fn_dict:typing.Dict[str, typing.List[str]]
                               ):
         '''
@@ -432,8 +432,8 @@ class SMAC(object):
 
             Arguments
             ---------
-            warmstart_trajectory_fns: typing.List[str],
-                trajectory files to initialize 
+            warmstart_trajectory_fns: typing.Dict[str, typing.List[str]],
+                dictionary of scenario file to list of trajectory files
             runhist_fn_dict:typing.Dict[str, typing.List[str]]
                 dictionary of scenario file to list of runhistory files
 
@@ -445,7 +445,7 @@ class SMAC(object):
         cw = ChallengerWarmstart(rng=self.solver.rng)
 
         init_challengers = cw.get_init_challengers(scenario=self.solver.scenario,
-                                                   traj_fn_list=warmstart_trajectory_fns,
+                                                   traj_dicts=warmstart_traj_dicts,
                                                    runhist_fn_dict=runhist_fn_dict,
                                                    hist2epm=self.solver.rh2EPM)
 

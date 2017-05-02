@@ -92,7 +92,9 @@ def merge_foreign_data(scenario: Scenario,
         if scenario.cutoff != in_scenario.cutoff:
             raise ValueError("Cutoffs of both scenarios have to be identical.")
 
+        # update features
         scenario.feature_dict.update(in_scenario.feature_dict)
+        scenario._update_feature_array()
         
         if update_train:
             scenario.train_insts = list(set(scenario.train_insts).union(in_scenario.train_insts))

@@ -8,6 +8,8 @@ __version__ = "0.0.1"
 import os
 import logging
 import numpy
+import glob
+import typing
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter, SUPPRESS
 
 
@@ -51,13 +53,16 @@ class CMDReader(object):
         req_opts.add_argument("--modus", default="SMAC",
                               choices=["SMAC", "ROAR"],
                               help=SUPPRESS)
+        
+        # list of runhistory dump files and corresponding scenario files
+        # format: <scen_file1>@rh_file1,rh_file2,... <scen_file2>@rh_fileN+1,...  
+        # scenario corresponding to --warmstart_runhistory; 
+        # pcs and feature space has to be identical with --scenario_file
         req_opts.add_argument("--warmstart_runhistory", default=None,
                               nargs="*",
                               help=SUPPRESS)  
-        # list of runhistory dump files and corresponding scenario files
-        # format: <scen_file1>@rh_file1,rh_file2,... <scen_file2>:rh_fileN+1,...  
-        # scenario corresponding to --warmstart_runhistory; 
-        # pcs and feature space has to be identical with --scenario_file
+
+        # same format as used for --warmstart_runhistory
         req_opts.add_argument("--warmstart_incumbent", default=None,
                               nargs="*",
                               help=SUPPRESS)# list of trajectory dump files, 
@@ -96,10 +101,17 @@ class CMDReader(object):
             raise ValueError("Not found: %s" % (args_.scenario_file))
         
         if args_.warmstart_runhistory:
-            warm_dict = {}
-            for entry in args_.warmstart_runhistory:
-                scen_fn,rh_files = entry.split("@")
-                if warm_dict.get(scen_fn):
-                    self.logger.warn("Redefined runhistories for scenario %s" %(scen_fn))
-                warm_dict[scen_fn] = rh_files.split(",")
-            args_.warmstart_runhistory = warm_dict
+            args_.warmstart_runhistory = self._convert_warm_args(arg=args_.warmstart_runhistory)
+        if args_.warmstart_incumbent:
+            args_.warmstart_incumbent = self._convert_warm_args(arg=args_.warmstart_incumbent)
+             
+    def _convert_warm_args(self, arg:typing.List[str]):
+        conv_dict = {}
+        for entry in arg:
+            scen_fn, files_ = entry.split("@")
+            if conv_dict.get(scen_fn):
+                self.logger.warn("Redefined data for scenario %s" %(scen_fn))
+            conv_dict[scen_fn] = []
+            for file_ in files_.split(","):
+                conv_dict[scen_fn].extend(glob.glob(file_))
+        return conv_dict

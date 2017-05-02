@@ -30,12 +30,12 @@ class ChallengerWarmstart(object):
         '''
         self.logger = logging.getLogger("ChallengerWarmstart")
 
-        self.VBS_THRESHOLD = 0.01
+        self.MARG_THRESHOLD = 0.05
         self.rng = rng
 
     def get_init_challengers(self,
                              scenario: Scenario,
-                             traj_fn_list: typing.List[str],
+                             traj_dicts: typing.Dict[str, typing.List[str]],
                              runhist_fn_dict: typing.Dict[str, typing.List[str]],
                              hist2epm: AbstractRunHistory2EPM,
                              ):
@@ -47,8 +47,8 @@ class ChallengerWarmstart(object):
             ---------
             scenario: Scenario
                 current scenario
-            traj_fn_list:typing.List[str]
-                list of trajectory files
+            traj_dicts: typing.Dict[str, typing.List[str]]
+                dictionary of scenario file to list of trajectory files
             runhist_fn_dict:typing.Dict[str, typing.List[str]]
                 dictionary of scenario file to list of runhistory files
             hist2epm:AbstractRunHistory2EPM
@@ -64,13 +64,13 @@ class ChallengerWarmstart(object):
         initial_configs = None
 
         initial_configs = [scenario.cs.get_default_configuration()]
-        for traj_fn in traj_fn_list:
-            trajectory = TrajLogger.read_traj_aclib_format(
-                fn=traj_fn, cs=scenario.cs)
-            inc = trajectory[-1]["incumbent"]
-            inc.origin = traj_fn
-            initial_configs.append(trajectory[-1]["incumbent"])
-
+        for scen_name, traj_fns in traj_dicts.items():
+            for traj_fn in traj_fns:
+                trajectory = TrajLogger.read_traj_aclib_format(
+                    fn=traj_fn, cs=scenario.cs)
+                inc = trajectory[-1]["incumbent"]
+                inc.origin = scen_name
+                initial_configs.append(trajectory[-1]["incumbent"])
 
         # using EPM, select a subset of initial configs
         if runhist_fn_dict:
@@ -91,8 +91,6 @@ class ChallengerWarmstart(object):
                 aggregate_func=average_cost,
                 update_train=True)
 
-            # update feature array
-            scenario._update_feature_array()
             hist2epm.instance_features = scenario.feature_dict
 
             # Convert rh
@@ -107,6 +105,7 @@ class ChallengerWarmstart(object):
             configs = initial_configs[:]
             C = convert_configurations_to_array(configs)
             
+            # get predictions for each configurations on each instance
             Y = []
             n_instances = len(scenario.feature_array)
             for c in enumerate(C):
@@ -123,12 +122,13 @@ class ChallengerWarmstart(object):
             sel_configs = [configs[0]]
             sel_Y = [Y[0]]
             # select one config per scenario
-            for traj_fn in traj_fn_list:
+            for origin in traj_dicts.keys():
                 scores = []
                 for c,Y_ in zip(configs,Y):
-                    if c.origin == traj_fn:
+                    if c.origin == origin:
                         scores.append((np.mean(Y_),Y_,c))
                 best_c_indx = np.argmin([s[0] for s in scores])
+                self.logger.debug("Best predicted cost %.2f for origin %s" %(scores[best_c_indx][0], origin))
                 sel_Y.append(scores[best_c_indx][1])
                 sel_configs.append(scores[best_c_indx][2])
             configs = sel_configs
@@ -155,16 +155,16 @@ class ChallengerWarmstart(object):
                 for i, c in enumerate(configs):
                     Y_add = np.reshape(Y_left[i, :], (1,Y.shape[1]))
                     Y_ = np.vstack([Y_sel, Y_add])
-                    marg = vbs - self._get_vbs(Y_)
-                    marg_contr.append(marg)
+                    marg_impr = 1 - (self._get_vbs(Y_) / vbs)
+                    marg_contr.append(marg_impr)
                 max_marg_index = np.argmax(marg_contr)
                 marg = marg_contr[max_marg_index]
-                if marg / np.abs(vbs) < self.VBS_THRESHOLD:
+                if marg < self.MARG_THRESHOLD:
                     self.logger.info(
-                        "Marginal contribution too small (%f) -- don't adding further initial configurations" % (marg / np.abs(vbs)))
+                        "Marginal contribution improvement too small (%f%%) -- don't adding further initial configurations" % (marg))
                     break
-                self.logger.info("%d : %f (%.2f perc)" %
-                                 (max_marg_index, marg, marg / vbs))
+                self.logger.info("%d : %f%%" %
+                                 (max_marg_index, marg))
                 initial_configs.append(configs[max_marg_index])
                 configs.remove(configs[max_marg_index])
                 Y_add = np.reshape(Y_left[i, :], (1,Y.shape[1]))
