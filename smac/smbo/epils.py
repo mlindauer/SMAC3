@@ -91,7 +91,7 @@ class EPILS_Solver(BaseSolver):
         self.acquisition_func = acquisition_func
         self.rng = rng
         
-        self.RESTART_PROB = 0.05
+        self.RESTART_PROB = 0.01
         self.MAX_NEIGHBORS = 5
         self.PERTUBATION_N = 3
         
@@ -195,7 +195,7 @@ class EPILS_Solver(BaseSolver):
             The best found configuration
         """
         
-        self.intensifier.minR = 1 # be too aggressive here!
+        self.intensifier.minR = 1 # be aggressive here!
         self.intensifier.log_traj = False
         
         incumbent = start_point
@@ -236,6 +236,7 @@ class EPILS_Solver(BaseSolver):
                     aggregate_func=self.aggregate_func,
                     time_bound=0.01)
                 
+                # first improvement SLS
                 if incumbent != prev_incumbent:
                     changed_inc = True
                     break

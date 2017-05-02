@@ -429,6 +429,8 @@ class Intensifier(object):
             challenger, run_history, to_compare_runs)
         inc_perf = aggregate_func(
             incumbent, run_history, to_compare_runs)
+        print("INC: %.2f vs %.2f :CHAL (on %d runs)" %(inc_perf, chal_perf, len(to_compare_runs)))
+        
 
         # Line 15
         if chal_perf > inc_perf and len(chall_runs) >= self.minR:
