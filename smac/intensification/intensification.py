@@ -432,8 +432,6 @@ class Intensifier(object):
             challenger, run_history, to_compare_runs)
         inc_perf = aggregate_func(
             incumbent, run_history, to_compare_runs)
-        print("INC: %.2f vs %.2f :CHAL (on %d runs)" %(inc_perf, chal_perf, len(to_compare_runs)))
-        
 
         # use statistical test to reject challenger
         if self.stat_test > 0.0:
