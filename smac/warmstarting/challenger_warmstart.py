@@ -30,7 +30,7 @@ class ChallengerWarmstart(object):
         '''
         self.logger = logging.getLogger("ChallengerWarmstart")
 
-        self.MARG_THRESHOLD = 0.05
+        self.MARG_THRESHOLD = 0.01
         self.rng = rng
 
     def get_init_challengers(self,
