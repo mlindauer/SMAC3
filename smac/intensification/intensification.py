@@ -7,13 +7,15 @@ from collections import Counter
 from collections import OrderedDict
 
 import numpy as np
+import scipy as sp
 
 from smac.smbo.objective import sum_cost
 from smac.stats.stats import Stats
 from smac.utils.constants import MAXINT, MAX_CUTOFF
 from smac.configspace import Configuration
-from smac.runhistory.runhistory import RunHistory
+from smac.runhistory.runhistory import RunHistory, RunKey
 from smac.tae.execute_ta_run import StatusType, BudgetExhaustedException, CappedRunException
+from pickle import INST
 
 __author__ = "Katharina Eggensperger, Marius Lindauer"
 __copyright__ = "Copyright 2017, ML4AAD"
@@ -91,6 +93,7 @@ class Intensifier(object):
         self._chall_indx = 0
         
         self.log_traj = True
+        self.stat_test = 0.05
 
     def intensify(self, challengers: typing.List[Configuration],
                   incumbent: Configuration,
@@ -431,11 +434,26 @@ class Intensifier(object):
             incumbent, run_history, to_compare_runs)
 
         # Line 15
-        if chal_perf > inc_perf and len(chall_runs) >= self.minR:
-            # Incumbent beats challenger
-            self.logger.debug("Incumbent (%.4f) is better than challenger (%.4f) on %d runs." % (
-                inc_perf, chal_perf, len(chall_runs)))
-            return incumbent
+        if self.stat_test > 0.0:
+            chall_id = run_history.config_ids[challenger]
+            inc_id = run_history.config_ids[incumbent]
+            x, y = [], []
+            for inst, seed in list(to_compare_runs):
+                rk = RunKey(chall_id, inst, seed)
+                x.append(run_history.data[rk].cost)
+                rk = RunKey(inc_id, inst, seed)
+                y.append(run_history.data[rk].cost)
+            if self._perm_test(x=np.array(x), y=np.array(y), alpha=self.stat_test):
+                self.logger.debug("Incumbent (%.4f) is better than challenger (%.4f) on %d runs (using permutation test)." % (
+                    inc_perf, chal_perf, len(chall_runs)))
+                return incumbent
+            
+        else:
+            if chal_perf > inc_perf and len(chall_runs) >= self.minR:
+                # Incumbent beats challenger
+                self.logger.debug("Incumbent (%.4f) is better than challenger (%.4f) on %d runs." % (
+                    inc_perf, chal_perf, len(chall_runs)))
+                return incumbent
 
         # Line 16
         if not set(inc_runs) - set(chall_runs):
@@ -464,3 +482,34 @@ class Intensifier(object):
             return challenger
 
         return None  # undecided
+    
+    def _perm_test(self, x:np.ndarray, y:np.ndarray, alpha:float=0.05, perms=10000):
+        '''
+            one-sided paired permutation test, 
+            H_1: y is better than x
+        '''
+        
+        n = x.shape[0]
+        base_metric = np.sum(x) - np.sum(y)
+        if base_metric == 0:
+            return False
+        XY = np.vstack((x,y))
+        print(XY)
+        metrics = []
+        for _ in range(perms):
+            XY = __permute_columns(x=XY)
+            metrics.append(np.sum(XY[0,:]) - np.sum(XY[1,:]))
+            print(XY)
+            print(XY[0,:].shape)
+        perc = sp.stats.percentileofscore(a=XY, score=base_metric, kind="weak")
+        print(perc)
+        if perc > 1 - alpha:
+            return True
+        else:
+            return False
+        
+    def __permute_columns(x):
+        ix_i = np.random.sample(x.shape).argsort(axis=0)
+        ix_j = np.tile(np.arange(x.shape[1]), (x.shape[0], 1))
+        return x[ix_i, ix_j]
+        

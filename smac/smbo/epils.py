@@ -148,7 +148,9 @@ class EPILS_Solver(BaseSolver):
             # decide global inc
             self.logger.info("Race local incumbent against global incumbent")
             self.intensifier.minR = 5 # don't be too aggressive here
+            self.intensifier.stat_test = 0.05
             self.intensifier.log_traj = True
+            self.intensifier.Adaptive_Capping_Slackfactor = 2
             self.incumbent, inc_perf = self.intensifier.intensify(
                     challengers=[local_inc],
                     incumbent=self.incumbent,
@@ -196,7 +198,9 @@ class EPILS_Solver(BaseSolver):
         """
         
         self.intensifier.minR = 1 # be too aggressive here!
+        self.intensifier.stat_test = 0.0
         self.intensifier.log_traj = False
+        self.intensifier.Adaptive_Capping_Slackfactor = 1.2
         
         incumbent = start_point
         # Compute the acquisition value of the incumbent
