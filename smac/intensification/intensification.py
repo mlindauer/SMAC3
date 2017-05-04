@@ -459,7 +459,7 @@ class Intensifier(object):
             # Challenger is as good as incumbent
             # and has at least the same runs as inc
             # -> change incumbent
-            if chal_perf <= inc_perf:
+            if chal_perf < inc_perf:
 
                 n_samples = len(inc_runs)
                 self.logger.info("Challenger (%.4f) is better than incumbent (%.4f) on %d runs." % (

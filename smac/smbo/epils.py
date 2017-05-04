@@ -126,7 +126,7 @@ class EPILS_Solver(BaseSolver):
             self.model.train(X, Y)            
             self.acquisition_func.update(model=self.model, eta=self.runhistory.get_cost(self.incumbent))
 
-            if iteration == 1:
+            if iteration == 1 and self.num_run == 1:
                 start_point = self.incumbent
             else:
                 # Restart?
