@@ -424,7 +424,8 @@ class SMAC(object):
         return self.trajectory
 
     def warmstart_challengers(self, warmstart_traj_dicts: typing.Dict[str, typing.List[str]],
-                              runhist_fn_dict:typing.Dict[str, typing.List[str]]
+                              runhist_fn_dict:typing.Dict[str, typing.List[str]],
+                              all_insts:bool=True
                               ):
         '''
             warmstart challengers with previous incumbents
@@ -436,10 +437,9 @@ class SMAC(object):
                 dictionary of scenario file to list of trajectory files
             runhist_fn_dict:typing.Dict[str, typing.List[str]]
                 dictionary of scenario file to list of runhistory files
-
-
-            warmstart_mode: str,
-                has to be in ["FULL","WEIGHTED","TRANSFER"] 
+            all_insts: bool
+                use all instances for performance predictions (set to True),
+                or use only the instances of the current scenario (set to False)                
         '''
 
         cw = ChallengerWarmstart(rng=self.solver.rng)
@@ -447,7 +447,8 @@ class SMAC(object):
         init_challengers = cw.get_init_challengers(scenario=self.solver.scenario,
                                                    traj_dicts=warmstart_traj_dicts,
                                                    runhist_fn_dict=runhist_fn_dict,
-                                                   hist2epm=self.solver.rh2EPM)
+                                                   hist2epm=self.solver.rh2EPM,
+                                                   all_insts=all_insts)
 
         self.solver.initial_design = MultiConfigInitialDesign(tae_runner=self.solver.intensifier.tae_runner,
                                                               scenario=self.solver.scenario,

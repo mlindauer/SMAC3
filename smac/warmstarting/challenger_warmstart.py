@@ -38,6 +38,7 @@ class ChallengerWarmstart(object):
                              traj_dicts: typing.Dict[str, typing.List[str]],
                              runhist_fn_dict: typing.Dict[str, typing.List[str]],
                              hist2epm: AbstractRunHistory2EPM,
+                             all_insts:bool=True
                              ):
         '''
             reads provided files and returns a list of previous incumbents as challengers 
@@ -53,6 +54,9 @@ class ChallengerWarmstart(object):
                 dictionary of scenario file to list of runhistory files
             hist2epm:AbstractRunHistory2EPM
                 object to convert runhistories into EPM training data
+            all_insts: bool
+                use all instances for performance predictions (set to True),
+                or use only the instances of the current scenario (set to False)
 
             Returns
             -------
@@ -60,6 +64,7 @@ class ChallengerWarmstart(object):
 
         '''
 
+        current_scenario = scenario
         scenario = copy.deepcopy(scenario)
         initial_configs = None
 
@@ -108,6 +113,9 @@ class ChallengerWarmstart(object):
             
             # get predictions for each configurations on each instance
             Y = []
+            if not all_insts:
+                scenario.feature_array = current_scenario.feature_array
+                self.logger.info("Use only current %d instances." %(scenario.feature_array.shape[0]))
             n_instances = len(scenario.feature_array)
             for c in enumerate(C):
                 X_ = np.hstack(

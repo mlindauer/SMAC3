@@ -68,7 +68,10 @@ class CMDReader(object):
                               nargs="*",
                               help=SUPPRESS)# list of trajectory dump files, 
                                             # reads runhistory 
-                                            # and uses final incumbent as challenger 
+                                            # and uses final incumbent as challenger
+        req_opts.add_argument("--wsi_all", default=False,
+                              action="store_true",
+                              help=SUPPRESS)# use all instances for selecting challengers 
         req_opts.add_argument("--warmstart_mode", default="None",
                               choices = ["None","FULL","WEIGHTED","TRANSFER"],
                               help=SUPPRESS)
