@@ -34,6 +34,7 @@ class SMACCLI(object):
         '''
             main function of SMAC for CLI interface
         '''
+        self.logger.info("SMAC call: %s" %(" ".join(sys.argv)))
 
         cmd_reader = CMDReader()
         args_, misc_args = cmd_reader.read_cmd()
@@ -43,13 +44,14 @@ class SMACCLI(object):
         root_logger = logging.getLogger()
         root_logger.setLevel(args_.verbose_level)
 
-        scen = Scenario(args_.scenario_file, misc_args)
+        scen = Scenario(args_.scenario_file, misc_args,
+                        run_id=args_.seed)
 
-        if args_.modus == "SMAC":
+        if args_.mode == "SMAC":
             optimizer = SMAC(
                 scenario=scen,
                 rng=np.random.RandomState(args_.seed))
-        elif args_.modus == "ROAR":
+        elif args_.mode == "ROAR":
             optimizer = ROAR(
                 scenario=scen,
                 rng=np.random.RandomState(args_.seed))

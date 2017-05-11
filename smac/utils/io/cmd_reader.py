@@ -46,14 +46,14 @@ class CMDReader(object):
                               help="scenario file in AClib format")
 
         req_opts = parser.add_argument_group("Optional Options")
-        req_opts.add_argument("--seed", default=12345, type=int,
+        req_opts.add_argument("--seed", default=1, type=int,
                               help="random seed")
         req_opts.add_argument("--verbose_level", default=logging.INFO,
                               choices=["INFO", "DEBUG"],
-                              help="random seed")
-        req_opts.add_argument("--modus", default="SMAC",
+                              help="verbose level")
+        req_opts.add_argument("--mode", default="SMAC",
                               choices=["SMAC", "ROAR"],
-                              help=SUPPRESS)
+                              help="Configuration mode.")
         
         # list of runhistory dump files and corresponding scenario files
         # format: <scen_file1>@rh_file1,rh_file2,... <scen_file2>@rh_fileN+1,...  
