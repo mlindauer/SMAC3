@@ -96,8 +96,9 @@ class ChallengerWarmstart(object):
             # Convert rh
             X, y = hist2epm.transform(runhistory=rh)
             # initial EPM
-            types = get_types(scenario.cs, scenario.feature_array)
+            types, bounds = get_types(scenario.cs, scenario.feature_array)
             model = RandomForestWithInstances(types=types,
+                                              bounds=bounds,
                                               instance_features=scenario.feature_array,
                                               seed=self.rng.randint(MAXINT))
             model.train(X, y)

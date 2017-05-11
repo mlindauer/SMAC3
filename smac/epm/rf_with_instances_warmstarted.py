@@ -29,6 +29,8 @@ class WarmstartedRandomForestWithInstances(RandomForestWithInstances):
         2 dimension where the first dimension consists of 3 different
         categorical choices and the second dimension is continuous than we
         have to pass np.array([2, 0]). Note that we count starting from 0.
+    bounds: np.ndarray (D, 2)
+        Specifies the bounds for continuous features
     instance_features: np.ndarray (I, K)
         Contains the K dimensional instance features
         of the I different instances
@@ -56,6 +58,7 @@ class WarmstartedRandomForestWithInstances(RandomForestWithInstances):
     '''
 
     def __init__(self, types,
+                 bounds,
                  instance_features=None,
                  num_trees=10,
                  do_bootstrapping=True,
@@ -69,7 +72,7 @@ class WarmstartedRandomForestWithInstances(RandomForestWithInstances):
                  seed=42,
                  warmstart_models=None):
 
-        RandomForestWithInstances.__init__(self, types=types,
+        RandomForestWithInstances.__init__(self, types=types, bounds=bounds,
                                            instance_features=instance_features,
                                            num_trees=num_trees,
                                            do_bootstrapping=do_bootstrapping,

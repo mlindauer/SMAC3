@@ -83,8 +83,8 @@ class TransferWarmstart(object):
             runhistory2epm.instance_features = warm_scen.feature_dict
             runhistory2epm.n_feats = warm_scen.n_features
             X, y = runhistory2epm.transform(warm_rh)
-            warm_types = get_types(warm_scen.cs, warm_scen.feature_array)
-            warm_model = RandomForestWithInstances(types=warm_types,
+            warm_types, warm_bounds = get_types(warm_scen.cs, warm_scen.feature_array)
+            warm_model = RandomForestWithInstances(types=warm_types, bounds=warm_bounds,
                                                    instance_features=warm_scen.feature_array,
                                                    seed=self.rng.randint(MAXINT))
             warm_model.train(X, y)
@@ -120,9 +120,9 @@ class TransferWarmstart(object):
             runhistory2epm=runhistory2epm,
             cs=scenario.cs,
             cmd_args=scenario.cmd_args)
-        types = get_types(scenario.cs, scenario.feature_array)
+        types, bounds = get_types(scenario.cs, scenario.feature_array)
 
-        return WarmstartedRandomForestWithInstances(types=types,
+        return WarmstartedRandomForestWithInstances(types=types, bounds=bounds,
                                                     instance_features=scenario.feature_array,
                                                     seed=self.rng.randint(
                                                         MAXINT),
