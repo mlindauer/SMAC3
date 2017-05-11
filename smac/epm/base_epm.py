@@ -4,6 +4,7 @@ import numpy as np
 
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import MinMaxScaler
+from sklearn.exceptions import NotFittedError
 
 __author__ = "Marius Lindauer"
 __copyright__ = "Copyright 2016, ML4AAD"
@@ -76,7 +77,7 @@ class AbstractEPM(object):
         self.n_params = X.shape[1] - self.n_feats
 
         # reduce dimensionality of features of larger than PCA_DIM
-        if self.pca:
+        if self.pca and X.shape[0] > 1:
             X_feats = X[:, -self.n_feats:]
             # scale features
             X_feats = self.scaler.fit_transform(X_feats)
@@ -126,10 +127,13 @@ class AbstractEPM(object):
             Predictive variance
         '''
         if self.pca:
-            X_feats = X[:, -self.n_feats:]
-            X_feats = self.scaler.transform(X_feats)
-            X_feats = self.pca.transform(X_feats)
-            X = np.hstack((X[:, :self.n_params], X_feats))
+            try:
+                X_feats = X[:, -self.n_feats:]
+                X_feats = self.scaler.transform(X_feats)
+                X_feats = self.pca.transform(X_feats)
+                X = np.hstack((X[:, :self.n_params], X_feats))
+            except NotFittedError: 
+                pass # PCA not fitted if only one training sample
 
         return self._predict(X)
 
@@ -151,8 +155,8 @@ class AbstractEPM(object):
         '''
         raise NotImplementedError()
 
-    def predict_marginalized_over_instances(self, X: np.ndarray):
-        '''Predict mean and variance marginalized over all instances.
+    def predict_marginalized_over_instances(self, X):
+        """Predict mean and variance marginalized over all instances.
 
         Returns the predictive mean and variance marginalised over all
         instances for a set of configurations.
@@ -167,7 +171,7 @@ class AbstractEPM(object):
             Predictive mean
         vars : np.ndarray  of shape = [n_samples, 1]
             Predictive variance
-        '''
+        """
 
         if self.instance_features is None or \
                 len(self.instance_features) == 0:
@@ -176,32 +180,34 @@ class AbstractEPM(object):
             var[np.isnan(var)] = self.var_threshold
             return mean, var
         else:
-            n_instance_features = self.instance_features.shape[1]
             n_instances = len(self.instance_features)
 
         if len(X.shape) != 2:
             raise ValueError(
                 'Expected 2d array, got %dd array!' % len(X.shape))
+        if X.shape[1] != self.bounds.shape[0]:
+            raise ValueError('Rows in X should have %d entries but have %d!' %
+                             (self.bounds.shape[0],
+                              X.shape[1]))
 
-        if X.shape[1] != self.n_params:
-            raise ValueError(
-                "Rows in X should have %d entries "
-                "but have %d!" % (self.n_params, X.shape[1]))
-
-        mean = np.zeros((X.shape[0], 1))
-        var = np.zeros((X.shape[0], 1))
+        mean = np.zeros(X.shape[0])
+        var = np.zeros(X.shape[0])
         for i, x in enumerate(X):
             X_ = np.hstack(
                 (np.tile(x, (n_instances, 1)), self.instance_features))
             means, vars = self.predict(X_)
             # use only mean of variance and not the variance of the mean here
-            # since we don't want to reason about the instance hardness
-            # distribution
+            # since we don't want to reason about the instance hardness distribution
             var_x = np.mean(vars)  # + np.var(means)
-            if var_x < self.var_threshold or np.isnan(var_x):
+            if var_x < self.var_threshold:
                 var_x = self.var_threshold
 
-            var[i, 0] = var_x
-            mean[i, 0] = np.mean(means)
+            var[i] = var_x
+            mean[i] = np.mean(means)
+
+        if len(mean.shape) == 1:
+            mean = mean.reshape((-1, 1))
+        if len(var.shape) == 1:
+            var = var.reshape((-1, 1))
 
         return mean, var
