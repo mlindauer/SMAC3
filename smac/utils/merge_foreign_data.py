@@ -35,7 +35,8 @@ def merge_foreign_data_from_file(scenario: Scenario,
 
         Returns
         -------
-            scenario, runhistory
+        scenario: Scenario
+        runhistory: Runhistory
     '''
 
     cmd_args = scenario.cmd_args
@@ -75,7 +76,8 @@ def merge_foreign_data(scenario: Scenario,
 
         Returns
         -------
-            scenario, runhistory
+        scenario: Scenario
+        runhistory: Runhistory
     '''
 
     # add further instance features

@@ -44,7 +44,7 @@ class RandomForestWithInstances(AbstractEPM):
     min_samples_leaf: int
         The minimum number of data points in a leaf.
     max_depth: int
-
+        The maximum depth of a single tree.
     eps_purity: float
 
     max_num_nodes: int
@@ -62,7 +62,7 @@ class RandomForestWithInstances(AbstractEPM):
                  min_samples_leaf=3,
                  max_depth=20,
                  eps_purity=1e-8,
-                 max_num_nodes=1000,
+                 max_num_nodes=2**20,
                  seed=42,
                  **kwargs):
 
@@ -187,8 +187,7 @@ class RandomForestWithInstances(AbstractEPM):
 
         Parameters
         ----------
-        X : np.ndarray of shape = [n_samples, n_features (config + instance
-        features)]
+        X : np.ndarray of shape = [n_samples, n_features (config + instance features)]
 
         Returns
         -------

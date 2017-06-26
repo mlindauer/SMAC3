@@ -8,7 +8,6 @@ import math
 
 
 from smac.optimizer.acquisition import AbstractAcquisitionFunction
-from smac.optimizer.base_solver import BaseSolver
 from smac.epm.rf_with_instances import RandomForestWithInstances
 from smac.optimizer.local_search import LocalSearch
 from smac.intensification.intensification import Intensifier
@@ -19,7 +18,6 @@ from smac.stats.stats import Stats
 from smac.initial_design.initial_design import InitialDesign
 from smac.scenario.scenario import Scenario
 from smac.configspace import Configuration, convert_configurations_to_array
-from smac.tae.execute_ta_run import TAEAbortException, BudgetExhaustedException
 from smac.tae.execute_ta_run import FirstRunCrashedException
 
 
@@ -28,7 +26,7 @@ __copyright__ = "Copyright 2015, ML4AAD"
 __license__ = "3-clause BSD"
 
 
-class SMBO(BaseSolver):
+class SMBO(object):
 
     def __init__(self,
                  scenario: Scenario,
@@ -73,7 +71,8 @@ class SMBO(BaseSolver):
         rng: np.random.RandomState
             Random number generator
         '''
-        self.logger = logging.getLogger(self.__module__ + "." + self.__class__.__name__)
+        self.logger = logging.getLogger(
+            self.__module__ + "." + self.__class__.__name__)
         self.incumbent = None
 
         self.scenario = scenario
@@ -155,7 +154,8 @@ class SMBO(BaseSolver):
 
     def choose_next(self, X, Y,
                     num_configurations_by_random_search_sorted: int=1000,
-                    num_configurations_by_local_search: int=None):
+                    num_configurations_by_local_search: int=None,
+                    incumbent_value:float=None):
         """Choose next candidate solution with Bayesian optimization.
 
         Parameters
@@ -170,6 +170,11 @@ class SMBO(BaseSolver):
         num_configurations_by_local_search: int
             number of configurations optimized with local search
             if None, we use min(10, 1 + 0.5 x the number of configurations on exp average in intensify calls)
+        incumbent_value: cost value of incumbent configuration 
+            (required for acquisition function);
+            if not given, it will be inferred from runhistory;
+            if not given and runhistory is empty,
+            it will raise a ValueError
 
         Returns
         -------
@@ -183,12 +188,9 @@ class SMBO(BaseSolver):
 
         self.model.train(X, Y)
 
-        if self.runhistory.empty():
-            incumbent_value = 0.0
-        elif self.incumbent is None:
-            # TODO try to calculate an incumbent from the runhistory!
-            incumbent_value = 0.0
-        else:
+        if incumbent_value is None:
+            if self.runhistory.empty():
+                raise ValueError("runhistory is empty and the cost value of the incumbent is unknown.")
             incumbent_value = self.runhistory.get_cost(self.incumbent)
 
         self.acquisition_func.update(X=X, model=self.model, eta=incumbent_value)
@@ -205,14 +207,21 @@ class SMBO(BaseSolver):
             else:
                 num_configurations_by_local_search = 10
 
-        # initiate local search with best configurations from previous runs
-        configs_previous_runs = self.runhistory.get_all_configs()
-        configs_previous_runs_sorted = self._sort_configs_by_acq_value(configs_previous_runs)
-        num_configs_local_search = min(len(configs_previous_runs_sorted), num_configurations_by_local_search)
+        if self.runhistory.empty():
+            init_sls_points = self.config_space.sample_configuration(
+                size=num_configurations_by_local_search)
+        else:
+            # initiate local search with best configurations from previous runs
+            configs_previous_runs = self.runhistory.get_all_configs()
+            configs_previous_runs_sorted = self._sort_configs_by_acq_value(
+                configs_previous_runs)
+            num_configs_local_search = min(
+                len(configs_previous_runs_sorted), num_configurations_by_local_search)
+            init_sls_points = list(map(lambda x: x[1],
+                                       configs_previous_runs_sorted[:num_configs_local_search]))
+
         next_configs_by_local_search = \
-            self._get_next_by_local_search(
-                list(map(lambda x: x[1],
-                         configs_previous_runs_sorted[:num_configs_local_search])))
+            self._get_next_by_local_search(init_sls_points)
 
         # Having the configurations from random search, sorted by their
         # acquisition function value is important for the first few iterations
@@ -250,7 +259,8 @@ class SMBO(BaseSolver):
         """
 
         if num_points > 1:
-            rand_configs = self.config_space.sample_configuration(size=num_points)
+            rand_configs = self.config_space.sample_configuration(
+                size=num_points)
         else:
             rand_configs = [self.config_space.sample_configuration(size=1)]
         if _sorted:
@@ -340,12 +350,12 @@ class SMBO(BaseSolver):
         if (frac_intensify <= 0 or frac_intensify >= 1):
             raise ValueError("The value for intensification_percentage-"
                              "option must lie in (0,1), instead: %.2f" % (frac_intensify))
-        total_time = time_spent / (1-frac_intensify)
+        total_time = time_spent / (1 - frac_intensify)
         time_left = frac_intensify * total_time
         self.logger.debug("Total time: %.4f, time spent on choosing next "
                           "configurations: %.4f (%.2f), time left for "
                           "intensification: %.4f (%.2f)" % (total_time,
-                time_spent, (1-frac_intensify), time_left, frac_intensify))
+                                                            time_spent, (1 - frac_intensify), time_left, frac_intensify))
         return time_left
 
 
