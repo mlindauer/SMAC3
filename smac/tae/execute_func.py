@@ -6,6 +6,7 @@ import numpy as np
 import pynisher
 
 from smac.tae.execute_ta_run import StatusType, ExecuteTARun
+from smac.utils.constants import MAXINT
 
 __author__ = "Marius Lindauer, Matthias Feurer"
 __copyright__ = "Copyright 2015, ML4AAD"
@@ -22,10 +23,11 @@ class AbstractTAFunc(ExecuteTARun):
     """
 
     def __init__(self, ta, stats=None, runhistory=None, run_obj="quality",
-                 memory_limit=None, par_factor=1):
+                 memory_limit=None, par_factor=1, cost_for_crash=float(MAXINT)):
 
         super().__init__(ta=ta, stats=stats, runhistory=runhistory,
-                         run_obj=run_obj, par_factor=par_factor)
+                         run_obj=run_obj, par_factor=par_factor,
+                         cost_for_crash=cost_for_crash)
 
         signature = inspect.signature(ta).parameters
         self._accepts_seed = len(signature) > 1
@@ -42,13 +44,13 @@ class AbstractTAFunc(ExecuteTARun):
             instance_specific="0"):
 
         """
-            runs target algorithm <self.ta> with configuration <config>for at
-            most <cutoff> seconds allowing it to use at most <memory_limit>
+            runs target algorithm <self.ta> with configuration <config> for at
+            most <cutoff> seconds, allowing it to use at most <memory_limit>
             RAM.
 
             Whether the target algorithm is called with the <instance> and
             <seed> depends on the subclass implementing the actual call to
-            the target algorithm
+            the target algorithm.
 
             Parameters
             ----------
@@ -77,7 +79,7 @@ class AbstractTAFunc(ExecuteTARun):
                 additional_info: dict
                     all further additional run information
         """
-        
+
         # walltime for pynisher has to be a rounded up integer
         if cutoff is not None:
             cutoff = int(math.ceil(cutoff))
