@@ -4,6 +4,7 @@ import logging
 
 from sklearn.linear_model import SGDRegressor
 from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_squared_error
 
 import pyrfr.regression
 
@@ -86,7 +87,7 @@ class WarmstartedRandomForestWithInstances(RandomForestWithInstances):
                                            seed=seed)
 
         self.warmstart_models = warmstart_models
-        self.sgd = SGDRegressor(random_state=12345, warm_start=True, n_iter=20)
+        self.sgd = SGDRegressor(random_state=12345, warm_start=True, n_iter=100)
 
         self.logger = logging.getLogger("WarmstartedRandomForestWithInstances")
 
@@ -112,7 +113,6 @@ class WarmstartedRandomForestWithInstances(RandomForestWithInstances):
         if X.shape[0] >= 3:
             X_train, X_test, y_train, y_test = train_test_split(
                 X, y, test_size=0.33, random_state=self.seed)
-            print("Use train test")
         else:
             # too few samples, train=test
             X_train, X_test, y_train, y_test = X, X, y, y
@@ -135,7 +135,9 @@ class WarmstartedRandomForestWithInstances(RandomForestWithInstances):
         self.sgd.fit(y_, np.ravel(y_test))
         self.logger.info("Model weights: %s + intercept: %f" %
                           (str(self.sgd.coef_), self.sgd.intercept_))
-
+        rmse = mean_squared_error(self.sgd.predict(y_), np.ravel(y_test))
+        self.logger.info("Training RMSE: %f" %(rmse))
+        
         return self
 
     #=========================================================================
@@ -176,7 +178,11 @@ class WarmstartedRandomForestWithInstances(RandomForestWithInstances):
             vars.append(warm_y[1])
 
         mean = np.average(means, weights=weights, axis=0) + self.sgd.intercept_
+        # normalize weights to 1
+        weights = np.abs(weights) / np.sum(weights)
+        # variance of means
         var_of_means = np.average((means - mean)**2, weights=weights, axis=0)
+        # total law of variance
         var = np.average(vars, weights=weights, axis=0) + var_of_means
 
         return mean, var
