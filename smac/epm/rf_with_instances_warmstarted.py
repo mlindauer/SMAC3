@@ -179,7 +179,7 @@ class WarmstartedRandomForestWithInstances(RandomForestWithInstances):
 
         mean = np.average(means, weights=weights, axis=0) + self.sgd.intercept_
         # normalize weights to 1
-        weights = np.abs(weights) / np.sum(weights)
+        weights = np.abs(weights) / np.sum(np.abs(weights))
         # variance of means
         var_of_means = np.average((means - mean)**2, weights=weights, axis=0)
         # total law of variance
