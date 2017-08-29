@@ -20,10 +20,10 @@ for scenario in os.listdir():
     
     print(scenario)
 
-    log_fns = glob.glob("%s/SMAC3WEI/run*/log-*.txt" %(scenario))
+    log_fns = glob.glob("%s/SMAC3_WEI/run*/log-*.txt" %(scenario))
     
     float_regex = '[+-]?\d+(?:\.\d+)?(?:[eE][+-]\d+)?'
-    regex_str = "INFO:   Model weights: \[[ ]*(?P<w1>{0})[ ]*(?P<w2>{0})[ ]*(?P<w3>{0})[ ]*\] \+ intercept: (?P<intercept>{0})".format(float_regex)
+    regex_str = "INFO:    Model weights: \[[ ]*(?P<w1>{0})[ ]*(?P<w2>{0})[ ]*(?P<w3>{0})[ ]*\] \+ intercept: (?P<intercept>{0})".format(float_regex)
     reg = re.compile(regex_str)
     
     all_data = []
